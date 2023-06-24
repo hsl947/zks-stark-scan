@@ -1,0 +1,71 @@
+/*
+ * @Author: Shaoli
+ * @Date: 2023-06-24 11:20:02
+ * @LastEditors: Shaoli
+ * @LastEditTime: 2023-06-24 21:37:42
+ * @Description: 请填写文件描述
+ */
+import MenuHeader from "@pages/MenuHeader/index.jsx";
+import Zksync from "@pages/Zksync/index.jsx";
+import {useLocation} from "react-router-dom";
+import Stark from "@pages/Stark/index.jsx";
+import {Layout, FloatButton} from "antd";
+import Layer from "@pages/Layer/index.jsx";
+import Mirror from "@pages/Mirror/index.jsx";
+import Coffee from "@pages/Coffee/index.jsx";
+import Deposit from "@pages/Deposit/index.jsx";
+import Notice from "@components/Notice/index.jsx";
+
+function MainPage() {
+    const location = useLocation()
+    return (
+        <div
+            style={{
+                backgroundColor: "#f0f2f5",
+                minHeight: "100vh",
+            }}
+        >
+            {/*<Notice/>*/}
+            <Layout>
+                <div
+                    style={{
+                        // paddingTop: "5px",
+                        minHeight: "85vh",
+                        backgroundColor: "#fff",
+                        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.06)",
+                        borderRadius: "4px",
+                        marginBottom: "45px",
+                    }}
+                >
+                    <div>
+                        {location.pathname === "/" && <Zksync/>}
+                        {location.pathname === "/zksync" && <Zksync/>}
+                        {location.pathname === "/starknet" && <Stark/>}
+                        {/* {location.pathname === "/layerzero" && <Layer/>}
+                        {location.pathname === "/mirror" && <Mirror/>}
+                        {location.pathname === "/coffee" && <Coffee/>}
+                        {location.pathname === "/deposit" && <Deposit/>} */}
+                    </div>
+                </div>
+                <div
+                    style={{
+                        position: "fixed",
+                        bottom: 0,
+                        width: "100%",
+                        zIndex: 9,
+                    }}
+                >
+                    <MenuHeader
+                        style={{
+                            backgroundColor: "#f0f2f5",
+                            borderBottom: "1px solid #e8e8e8",
+                            boxShadow: "0 2px 8px rgba(0, 0, 0, 0.06)",
+                        }}
+                    />
+                </div>
+            </Layout>
+        </div>
+    );
+}
+
+export default MainPage;
