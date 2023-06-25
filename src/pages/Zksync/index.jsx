@@ -935,7 +935,7 @@ function Zksync() {
                         dataSource={data}
                         pagination={false}
                         bordered={true}
-                        style={{marginBottom: "80px", zIndex: 2}}
+                        style={{marginBottom: "100px", zIndex: 2}}
                         size={"small"}
                         columns={columns}
                         sticky
