@@ -31,7 +31,8 @@ import {
     EditOutlined,
     PlusOutlined, SettingOutlined,
     SyncOutlined,
-    UploadOutlined
+    UploadOutlined,
+    ReloadOutlined
 } from "@ant-design/icons";
 
 const {TextArea} = Input;
@@ -564,6 +565,15 @@ function Zksync() {
     const handleBatchCancel = () => {
         setIsBatchModalVisible(false);
     };
+    useEffect(() => {
+        if(selectedKeys[0] === -1) {
+            handleRefresh()
+        }
+    }, [selectedKeys])
+    const handleSingleRefresh = (e, record) => {
+        e.stopPropagation()
+        setSelectedKeys([-1, record.key]);
+    };
     const [editingKey, setEditingKey] = useState(null);
     const columns = [
         {
@@ -573,37 +583,48 @@ function Zksync() {
             width: 50,
             render: (text, record, index) => index + 1,
         },
+        // {
+        //     title: "备注",
+        //     dataIndex: "name",
+        //     key: "name",
+        //     align: "center",
+        //     width: 70,
+        //     render: (text, record) => {
+        //         const isEditing = record.key === editingKey;
+        //         return isEditing ? (
+        //             <Input
+        //                 placeholder="请输入备注"
+        //                 defaultValue={text}
+        //                 onPressEnter={(e) => {
+        //                     record.name = e.target.value;
+        //                     setData([...data]);
+        //                     localStorage.setItem('addresses', JSON.stringify(data));
+        //                     setEditingKey(null);
+        //                 }}
+        //             />
+        //         ) : (
+        //             <>
+        //                 <Tag color="blue">{text}</Tag>
+        //                 <Button
+        //                     shape="circle"
+        //                     icon={<EditOutlined/>}
+        //                     size={"small"}
+        //                     onClick={() => setEditingKey(record.key)}
+        //                 />
+        //             </>
+        //         );
+        //     }
+        // },
         {
-            title: "备注",
-            dataIndex: "name",
-            key: "name",
+            title: "刷新",
+            key: "refresh",
             align: "center",
             width: 70,
-            render: (text, record) => {
-                const isEditing = record.key === editingKey;
-                return isEditing ? (
-                    <Input
-                        placeholder="请输入备注"
-                        defaultValue={text}
-                        onPressEnter={(e) => {
-                            record.name = e.target.value;
-                            setData([...data]);
-                            localStorage.setItem('addresses', JSON.stringify(data));
-                            setEditingKey(null);
-                        }}
-                    />
-                ) : (
-                    <>
-                        <Tag color="blue">{text}</Tag>
-                        <Button
-                            shape="circle"
-                            icon={<EditOutlined/>}
-                            size={"small"}
-                            onClick={() => setEditingKey(record.key)}
-                        />
-                    </>
-                );
-            }
+            render: (text, record) => (
+                <Space size="small">
+                    <Button onClick={(e) => handleSingleRefresh(e, record)} size="small" icon={<ReloadOutlined/>}/>
+                </Space>
+            ),
         },
         {
             title: "钱包地址",
@@ -612,11 +633,9 @@ function Zksync() {
             align: "center",
             width: 150,
             render: (text, record) => {
-                return isRowSatisfyCondition(record) ?
-                    <Paragraph copyable={{ text }}>
-                        <Text keyboard>{text.slice(0, 5) + "..." + text.slice(-4)}</Text>
-                    </Paragraph>
-                : text.slice(0, 5) + "..." + text.slice(-4) || <Spin/>;
+                return <Paragraph copyable={{ text }} style={{marginBottom: 0}}>
+                    <Text keyboard type={isRowSatisfyCondition(record) ? "warning" : "secondary"}>{text.slice(0, 5) + "..." + text.slice(-4)}</Text>
+                </Paragraph> || <Spin/>;
             },
         },
         {
@@ -643,7 +662,7 @@ function Zksync() {
             ],
         },
         {
-            title: "zkSyncLite",
+            title: "zkSync Lite",
             key: "zks_lite_group",
             className: "zks_lite",
             children: [
@@ -666,7 +685,7 @@ function Zksync() {
             ],
         },
         {
-            title: "zkSyncEra",
+            title: "zkSync Era",
             key: "zks_era_group",
             className: "zks_era",
             children: [
@@ -808,10 +827,11 @@ function Zksync() {
             title: "操作",
             key: "action",
             align: "center",
+            width: 70,
             render: (text, record) => (
                 <Space size="small">
                     <Popconfirm title={"确认删除？"} onConfirm={() => handleDelete(record.key)}>
-                        <Button icon={<DeleteOutlined/>}/>
+                        <Button size="small" icon={<DeleteOutlined/>}/>
                     </Popconfirm>
                 </Space>
             ),
@@ -901,16 +921,16 @@ function Zksync() {
 
                 >
                     <Form form={walletForm} layout="vertical">
-                        <Card title="设置钱包预期标准，若钱包达到设置标准，钱包地址背景会为蓝色，更清晰"
+                        <Card title="设置钱包预期标准，若钱包达到设置标准，钱包地址会为橙色，更清晰"
                               bordered={true}
                               style={{width: '100%'}}>
                             <Row gutter={[16, 16]}>
                                 <Col span={12}>
                                     <FormItem name="ETHTx" addonBefore="ETH Tx数量 ≥ "
                                               addonAfter="个"/>
-                                    <FormItem name="zkSyncLiteMinTx" addonBefore="zkSyncLite Tx数量 ≥ "
+                                    <FormItem name="zkSyncLiteMinTx" addonBefore="zkSync Lite Tx数 ≥ "
                                               addonAfter="个"/>
-                                    <FormItem name="zkSyncEraMinTx" addonBefore="zkSyncEra Tx数量 ≥ "
+                                    <FormItem name="zkSyncEraMinTx" addonBefore="zkSync Era Tx数 ≥ "
                                               addonAfter="个"/>
                                     <FormItem name="dayMin" addonBefore="日活跃数 ≥ " addonAfter="天"/>
                                     <FormItem name="weekMin" addonBefore="周活跃数 ≥ " addonAfter="周"/>
@@ -1013,15 +1033,15 @@ function Zksync() {
                     >
                         {batchloading ? `添加中 进度:(${batchProgress}/${batchLength})` : "批量添加地址"}
                     </Button>
-                    <Button type="primary" ghost onClick={handleRefresh} loading={isLoading}
+                    <Button disabled={!selectedKeys.length} type="primary" ghost onClick={handleRefresh} loading={isLoading}
                             size={"large"}
                             style={{width: "20%"}} icon={<SyncOutlined/>}>
                         {isLoading ? "正在刷新" : "刷新选中地址"}
                     </Button>
                     <Popconfirm title={"确认删除" + selectedKeys.length + "个地址？"}
                                 onConfirm={handleDeleteSelected}>
-                        <Button type="primary" danger size={"large"}
-                                style={{width: "20%"}} icon={<DeleteOutlined/>}>
+                        <Button disabled={!selectedKeys.length} type="primary" danger size={"large"}
+                                icon={<DeleteOutlined/>}>
                             删除选中地址
                         </Button>
                     </Popconfirm>

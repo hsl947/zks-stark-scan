@@ -13,7 +13,8 @@ import {
     EditOutlined,
     PlusOutlined,
     SyncOutlined,
-    UploadOutlined
+    UploadOutlined,
+    ReloadOutlined
 } from "@ant-design/icons";
 import './index.css'
 
@@ -518,6 +519,15 @@ const Stark = () => {
         localStorage.setItem('stark_addresses', JSON.stringify(data.filter(item => !selectedKeys.includes(item.key))));
         setSelectedKeys([]);
     }
+    useEffect(() => {
+        if(selectedKeys[0] === -1) {
+            handleRefresh()
+        }
+    }, [selectedKeys])
+    const handleSingleRefresh = (e, record) => {
+        e.stopPropagation()
+        setSelectedKeys([-1, record.key]);
+    };
     const exportToExcelFile = () => {
         exportToExcel(data, 'starkInfo');
     }
@@ -530,38 +540,49 @@ const Stark = () => {
             width: 50,
             render: (text, record, index) => index + 1,
         },
+        // {
+        //     title: "备注",
+        //     dataIndex: "name",
+        //     key: "name",
+        //     align: "center",
+        //     className: "name",
+        //     width: 70,
+        //     render: (text, record) => {
+        //         const isEditing = record.key === editingKey;
+        //         return isEditing ? (
+        //             <Input
+        //                 placeholder="请输入备注"
+        //                 defaultValue={text}
+        //                 onPressEnter={(e) => {
+        //                     record.name = e.target.value;
+        //                     setData([...data]);
+        //                     localStorage.setItem('stark_addresses', JSON.stringify(data));
+        //                     setEditingKey(null);
+        //                 }}
+        //             />
+        //         ) : (
+        //             <>
+        //                 <Tag color="blue">{text}</Tag>
+        //                 <Button
+        //                     shape="circle"
+        //                     icon={<EditOutlined/>}
+        //                     size={"small"}
+        //                     onClick={() => setEditingKey(record.key)}
+        //                 />
+        //             </>
+        //         );
+        //     },
+        // },
         {
-            title: "备注",
-            dataIndex: "name",
-            key: "name",
+            title: "刷新",
+            key: "refresh",
             align: "center",
-            className: "name",
             width: 70,
-            render: (text, record) => {
-                const isEditing = record.key === editingKey;
-                return isEditing ? (
-                    <Input
-                        placeholder="请输入备注"
-                        defaultValue={text}
-                        onPressEnter={(e) => {
-                            record.name = e.target.value;
-                            setData([...data]);
-                            localStorage.setItem('stark_addresses', JSON.stringify(data));
-                            setEditingKey(null);
-                        }}
-                    />
-                ) : (
-                    <>
-                        <Tag color="blue">{text}</Tag>
-                        <Button
-                            shape="circle"
-                            icon={<EditOutlined/>}
-                            size={"small"}
-                            onClick={() => setEditingKey(record.key)}
-                        />
-                    </>
-                );
-            },
+            render: (text, record) => (
+                <Space size="small">
+                    <Button onClick={(e) => handleSingleRefresh(e, record)} size="small" icon={<ReloadOutlined/>}/>
+                </Space>
+            ),
         },
         {
             title: "钱包地址",
@@ -786,7 +807,7 @@ const Stark = () => {
             render: (text, record) => (
                 <Space size="small">
                     <Popconfirm title={"确认删除？"} onConfirm={() => handleDelete(record.key)}>
-                        <Button icon={<DeleteOutlined/>}/>
+                        <Button size="small" icon={<DeleteOutlined/>}/>
                     </Popconfirm>
                 </Space>
             )
@@ -861,15 +882,14 @@ const Stark = () => {
                         }} size={"large"} style={{width: "20%"}} icon={<UploadOutlined/>}>
                             批量添加地址
                         </Button>
-                        <Button type="primary" ghost onClick={handleRefresh} loading={isLoading} size={"large"}
+                        <Button disabled={!selectedKeys.length} type="primary" ghost onClick={handleRefresh} loading={isLoading} size={"large"}
                                 style={{width: "20%"}}
                                 icon={<SyncOutlined/>}>
                             刷新选中地址
                         </Button>
                         <Popconfirm title={"确认删除" + selectedKeys.length + "个地址？"}
                                     onConfirm={handleDeleteSelected}>
-                            <Button type="primary" danger size={"large"}
-                                    style={{width: "20%"}}
+                            <Button disabled={!selectedKeys.length} type="primary" danger size={"large"}
                                     icon={<DeleteOutlined/>}>
                                 删除选中地址
                             </Button>
