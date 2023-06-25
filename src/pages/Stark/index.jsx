@@ -594,7 +594,7 @@ const Stark = () => {
             render: (text, record) => {
                 return text === null
                 ? <Spin/>
-                : <Paragraph copyable={{ text }}>
+                : <Paragraph copyable={{ text }} style={{marginBottom: 0}}>
                     <Text keyboard>{text.slice(0, 5) + "..." + text.slice(-4)}</Text>
                 </Paragraph>
             }
