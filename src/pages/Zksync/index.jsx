@@ -20,6 +20,7 @@ import {
     getZkSyncBridge,
     exportToExcel
 } from "@utils"
+import { convertTimeToHumanReadable } from "@utils/time"
 import {useEffect, useState} from "react";
 import './index.css';
 import {Layout, Card} from 'antd';
@@ -286,6 +287,7 @@ function Zksync() {
                 const index = newData.findIndex(item => item.key === key);
                 if (index !== -1) {
                     const item = newData[index];
+                    item.refresh = +new Date()
 
                     promisesQueue.push(() => {
                         item.zks2_balance = null;
@@ -573,9 +575,25 @@ function Zksync() {
     const handleSingleRefresh = (e, record) => {
         e.stopPropagation()
         setSelectedKeys([-1, record.key]);
+        const newData = [...data];
+        newData[record.key].refresh = +new Date()
+        setData(data)
     };
     const [editingKey, setEditingKey] = useState(null);
     const columns = [
+        {
+            title: "最后刷新",
+            key: "refresh",
+            dataIndex: "refresh",
+            align: "left",
+            width: 110,
+            render: (text, record) => (
+                <Space size="small">
+                    <Button onClick={(e) => handleSingleRefresh(e, record)} size="small" icon={<ReloadOutlined/>}/>
+                    <small>{convertTimeToHumanReadable(text)}</small>
+                </Space>
+            ),
+        },
         {
             title: "#",
             key: "index",
@@ -615,17 +633,6 @@ function Zksync() {
         //         );
         //     }
         // },
-        {
-            title: "刷新",
-            key: "refresh",
-            align: "center",
-            width: 70,
-            render: (text, record) => (
-                <Space size="small">
-                    <Button onClick={(e) => handleSingleRefresh(e, record)} size="small" icon={<ReloadOutlined/>}/>
-                </Space>
-            ),
-        },
         {
             title: "钱包地址",
             dataIndex: "address",
@@ -980,7 +987,7 @@ function Zksync() {
                             })
 
                             const emptyCells = Array(10).fill().map((_, index) => <Table.Summary.Cell
-                                index={index + 6}/>);
+                                index={index + 6} key={index}/>);
 
                             return (
                                 <>
