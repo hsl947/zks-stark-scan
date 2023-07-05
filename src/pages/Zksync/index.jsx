@@ -849,7 +849,7 @@ function Zksync() {
         localStorage.setItem('zksync_config', JSON.stringify(values));
         setZkSyncConfigStore(values);
         setIsWalletModalVisible(false);
-        console.log(zkSyncConfigStore)
+        // console.log(zkSyncConfigStore)
     };
     const FormItem = ({name, addonBefore, addonAfter}) => (
         <Form.Item name={name}>
@@ -958,6 +958,7 @@ function Zksync() {
                 </Modal>
                 <Spin spinning={tableLoading}>
                     <Table
+                        rowKey={record => record.key}
                         rowSelection={rowSelection}
                         dataSource={data}
                         pagination={false}
