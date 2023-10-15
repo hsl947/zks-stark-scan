@@ -9,379 +9,161 @@ import {
     Spin,
     Tag,
     Popconfirm,
-    Row, Col, InputNumber, Badge, message, Switch, Pagination,
-    Typography
+    Tooltip
 } from 'antd';
-import {
-    getEthBalance,
-    getTxCount,
-    getZksEra,
-    getZksLite,
-    getZkSyncBridge,
-    exportToExcel
-} from "@utils"
-import { convertTimeToHumanReadable } from "@utils/time"
+import {exportToExcel} from "@utils"
 import {useEffect, useState} from "react";
 import './index.css';
 import {Layout, Card} from 'antd';
-const { Paragraph, Text } = Typography;
+
 const {Content} = Layout;
 import {
+    AppstoreAddOutlined, CheckCircleOutlined, CloseCircleOutlined,
     DeleteOutlined,
     DownloadOutlined,
     EditOutlined,
-    PlusOutlined, SettingOutlined,
+    ReloadOutlined, SearchOutlined,
     SyncOutlined,
-    UploadOutlined,
-    ReloadOutlined
+    UploadOutlined
 } from "@ant-design/icons";
-
+import {EyeOutlined, EyeInvisibleOutlined} from "@ant-design/icons"
+import {getAllZksSyncData} from "@utils/getZksyncData/index.js";
+import EcosystemModal from "@components/EcosystemModal/index.jsx";
+import {useTranslation} from "react-i18next";
+import {dbConfig, get, initDB} from "@utils/indexedDB/main.js";
+import deleteData from "@utils/indexedDB/deleteData.js";
+import {Typography} from 'antd';
+import { convertTimeToHumanReadable } from "@utils/time"
+const {Text, Paragraph} = Typography;
 const {TextArea} = Input;
 
 function Zksync() {
-    const [batchProgress, setBatchProgress] = useState(0);
-    const [batchLength, setBatchLength] = useState(0);
+    const {t} = useTranslation();
     const [batchloading, setBatchLoading] = useState(false);
-    const [zkSyncConfigStore, setZkSyncConfigStore] = useState({});
     const [data, setData] = useState([]);
+    const [hideColumn, setHideColumn] = useState(true);
     const [isBatchModalVisible, setIsBatchModalVisible] = useState(false);
-    const [isWalletModalVisible, setIsWalletModalVisible] = useState(false);
+    const [ecosystemModalVisible, setEcosystemModalVisible] = useState(false);
     const [batchForm] = Form.useForm();
-    const [walletForm] = Form.useForm();
     const [selectedKeys, setSelectedKeys] = useState([]);
-    const [form] = Form.useForm();
-    const [isModalVisible, setIsModalVisible] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [tableLoading, setTableLoading] = useState(false);
+    const [showAddressDetailModal, setShowAddressDetailModal] = useState(null);
+    const [addressDetail, setAddressDetail] = useState(null);
+    const [initialized, setInitialized] = useState(false);
+    const [isGetTustalabsData, setIsGetTustalabsData] = useState(true);
+    let idCounter = data.length + 1;
     useEffect(() => {
-        setBatchProgress(0);
-        const zksync_config = localStorage.getItem('zksync_config');
-        if (zksync_config) {
-            const config = JSON.parse(zksync_config);
-            setZkSyncConfigStore(config);
-            walletForm.setFieldsValue(config);
-        } else {
-            setZkSyncConfigStore(
-                {
-                    "ETHTx": null,
-                    "zkSyncLiteMinTx": null,
-                    "zkSyncEraMinTx": null,
-                    "dayMin": null,
-                    "weekMin": null,
-                    "monthMin": null,
-                    "L1ToL2Tx": null,
-                    "L2ToL1Tx": null,
-                    "L1ToL2ETH": null,
-                    "L2ToL1ETH": null,
-                    "gasFee": null,
-                    "contractMin": null,
-                    "totalAmount": null,
-                }
-            )
+        const storedIsGetTustalabsData = localStorage.getItem('isGetTustalabsData');
+        if (storedIsGetTustalabsData) {
+            setIsGetTustalabsData(storedIsGetTustalabsData === 'true');
         }
     }, []);
-    const handleOk = async () => {
-        try {
-            const values = await form.validateFields();
-            if (values.address.length !== 42) {
-                notification.error({
-                    message: "错误",
-                    description: "请输入正确的地址",
-                }, 2);
-                return;
-            }
-            setIsModalVisible(false);
-            const index = data.findIndex(item => item.address === values.address);
-            if (index !== -1) {
-                setData(data.map((item, i) => {
-                    if (i === index) {
-                        return {
-                            ...item,
-                            name: values.name,
-                        }
-                    }
-                    return item;
-                }));
-                const updatedData = [...data];
-                getZksEra(values.address).then(({balance2, tx2, usdcBalance}) => {
-                    updatedData[index] = {
-                        ...updatedData[index],
-                        zks2_balance: balance2,
-                        zks2_tx_amount: tx2,
-                        zks2_usdcBalance: usdcBalance,
-                    };
-                    setData(updatedData);
-                    localStorage.setItem('addresses', JSON.stringify(data));
-                })
-                getZksLite(values.address).then(({balance1, tx1}) => {
-                    updatedData[index] = {
-                        ...updatedData[index],
-                        zks1_balance: balance1,
-                        zks1_tx_amount: tx1,
-                    };
-                    setData(updatedData);
-                    localStorage.setItem('addresses', JSON.stringify(data));
+    useEffect(() => {
+        setTableLoading(true);
 
-                })
-                getEthBalance(values.address, "ethereum").then((eth_balance) => {
-                    updatedData[index] = {
-                        ...updatedData[index],
-                        eth_balance,
-                    };
-                    setData(updatedData);
-                    localStorage.setItem('addresses', JSON.stringify(data));
+        const storedAddresses = localStorage.getItem('addresses');
+        setTimeout(() => {
+            setTableLoading(false);
+        }, 500);
 
-                })
-                getTxCount(values.address, "ethereum").then((eth_tx_amount) => {
-                    updatedData[index] = {
-                        ...updatedData[index],
-                        eth_tx_amount,
-                    };
-                    setData(updatedData);
-                    localStorage.setItem('addresses', JSON.stringify(data));
-                })
-                getZkSyncBridge(values.address).then(({
-                                                          zks2_last_tx,
-                                                          totalExchangeAmount,
-                                                          totalFee,
-                                                          contractActivity,
-                                                          dayActivity,
-                                                          weekActivity,
-                                                          monthActivity,
-                                                          l1Tol2Times,
-                                                          l1Tol2Amount,
-                                                          l2Tol1Times,
-                                                          l2Tol1Amount
-                                                      }) => {
-                    updatedData[index] = {
-                        ...updatedData[index],
-                        zks2_last_tx,
-                        totalExchangeAmount,
-                        totalFee,
-                        contractActivity,
-                        dayActivity,
-                        weekActivity,
-                        monthActivity,
-                        l1Tol2Times,
-                        l1Tol2Amount,
-                        l2Tol1Times,
-                        l2Tol1Amount,
-                    };
-                    setData(updatedData);
-                    localStorage.setItem('addresses', JSON.stringify(data));
-                })
-            } else {
-                const newEntry = {
-                    key: data.length.toString(),
-                    name: values.name,
-                    address: values.address,
-                    eth_balance: null,
-                    eth_tx_amount: null,
-                    zks2_balance: null,
-                    zks2_tx_amount: null,
-                    zks2_usdcBalance: null,
-                    zks2_last_tx: null,
-                    zks1_balance: null,
-                    zks1_tx_amount: null,
-                    dayActivity: null,
-                    weekActivity: null,
-                    monthActivity: null,
-                    l1Tol2Times: null,
-                    l1Tol2Amount: null,
-                    l2Tol1Times: null,
-                    l2Tol1Amount: null,
-                    contractActivity: null,
-                    totalFee: null,
-                    totalExchangeAmount: null,
-                };
-                const newData = [...data, newEntry];
-                setData(newData);
-                getZksEra(values.address).then(({balance2, tx2, usdcBalance}) => {
-                    newEntry.zks2_balance = balance2;
-                    newEntry.zks2_tx_amount = tx2;
-                    newEntry.zks2_usdcBalance = usdcBalance;
-                    setData([...newData]);
-                    localStorage.setItem('addresses', JSON.stringify(newData));
-                })
-                getZksLite(values.address).then(({balance1, tx1}) => {
-                    newEntry.zks1_balance = balance1;
-                    newEntry.zks1_tx_amount = tx1;
-                    setData([...newData]);
-                    localStorage.setItem('addresses', JSON.stringify(newData));
-
-                })
-                getEthBalance(values.address, "ethereum").then((eth_balance) => {
-                    newEntry.eth_balance = eth_balance;
-                    setData([...newData]);
-                    localStorage.setItem('addresses', JSON.stringify(newData));
-
-                })
-                getTxCount(values.address, "ethereum").then((eth_tx_amount) => {
-                    newEntry.eth_tx_amount = eth_tx_amount;
-                    setData([...newData]);
-                    localStorage.setItem('addresses', JSON.stringify(newData));
-                })
-                getZkSyncBridge(values.address).then(({
-                                                          zks2_last_tx,
-                                                          totalExchangeAmount,
-                                                          totalFee,
-                                                          contractActivity,
-                                                          dayActivity,
-                                                          weekActivity,
-                                                          monthActivity,
-                                                          l1Tol2Times,
-                                                          l1Tol2Amount,
-                                                          l2Tol1Times,
-                                                          l2Tol1Amount
-                                                      }) => {
-                    newEntry.zks2_last_tx = zks2_last_tx;
-                    newEntry.totalFee = totalFee;
-                    newEntry.contractActivity = contractActivity;
-                    newEntry.dayActivity = dayActivity;
-                    newEntry.weekActivity = weekActivity;
-                    newEntry.monthActivity = monthActivity;
-                    newEntry.l1Tol2Times = l1Tol2Times;
-                    newEntry.l1Tol2Amount = l1Tol2Amount;
-                    newEntry.l2Tol1Times = l2Tol1Times;
-                    newEntry.l2Tol1Amount = l2Tol1Amount;
-                    newEntry.totalExchangeAmount = totalExchangeAmount;
-                    setData([...newData]);
-                    localStorage.setItem('addresses', JSON.stringify(newData));
-                })
-            }
-        } catch (error) {
-            notification.error({
-                message: "错误",
-                description: error.message,
-            }, 2);
-        } finally {
-            form.resetFields();
+        if (storedAddresses) {
+            setData(JSON.parse(storedAddresses));
         }
-    }
-    const handleRefresh = async () => {
-        if (!selectedKeys.length) {
+
+        setInitialized(true);
+    }, []);
+
+    useEffect(() => {
+        if (!initialized) return;
+
+        localStorage.setItem('addresses', JSON.stringify(data));
+    }, [data, initialized]);
+    const handleRefresh = async (singleKey) => {
+        const keys = singleKey ? [singleKey] : selectedKeys;
+        if (!keys.length) {
             notification.error({
-                message: "错误",
-                description: "请先选择要刷新的地址",
-            }, 2);
+                message: t('zk_error'),
+                description: t('zk_error_msg3'),
+                duration: 1
+            });
             return;
         }
         setIsLoading(true);
         try {
-            const limit = 50;
+            const limit = 5;
             let activePromises = 0;
             let promisesQueue = [];
-            const newData = [...data];
             const processQueue = () => {
-                while (activePromises < limit && promisesQueue.length > 0) {
+                while (promisesQueue.length > 0 && activePromises < limit) {
                     const promise = promisesQueue.shift();
                     activePromises += 1;
-
                     promise().finally(() => {
                         activePromises -= 1;
                         processQueue();
                     });
                 }
             };
-            for (let key of selectedKeys) {
-                const index = newData.findIndex(item => item.key === key);
-                if (index !== -1) {
-                    const item = newData[index];
-                    item.refresh = +new Date()
+            for (let key of keys) {
 
-                    promisesQueue.push(() => {
-                        item.zks2_balance = null;
-                        item.zks2_tx_amount = null;
-                        item.zks2_usdcBalance = null;
-                        return getZksEra(item.address).then(({balance2, tx2, usdcBalance}) => {
-                            item.zks2_balance = balance2;
-                            item.zks2_tx_amount = tx2;
-                            item.zks2_usdcBalance = usdcBalance;
-                            setData([...newData]);
-                            localStorage.setItem('addresses', JSON.stringify(newData));
-                        })
+                const index = data.findIndex(item => item.key === key);
+                if (index !== -1) {
+                    const promiseFunction = () => new Promise(async (resolve, reject) => {
+                        try {
+                            setData(prevData => {
+                                const updatedData = [...prevData];
+                                for (let field in updatedData[index]) {
+                                    if (field !== 'address' && field !== 'name' && field !== 'key') {
+                                        if (field === "result") {
+                                            updatedData[index][field] = "pending";
+                                        } else {
+                                            updatedData[index][field] = null;
+                                        }
+                                    }
+                                }
+                                return updatedData;
+                            });
+
+                            const response = await getAllZksSyncData(data[index].address, isGetTustalabsData);
+                            setData(prevData => {
+                                const updatedData = [...prevData];
+                                updatedData[index] = {
+                                    ...updatedData[index],
+                                    ...response,
+                                    refresh: +new Date()
+                                };
+                                localStorage.setItem('addresses', JSON.stringify(updatedData));
+                                return updatedData;
+                            });
+                            resolve();
+                        } catch (error) {
+                            reject(error);
+                        }
                     });
-                    promisesQueue.push(() => {
-                        item.zks1_balance = null;
-                        item.zks1_tx_amount = null;
-                        return getZksLite(item.address).then(({balance1, tx1}) => {
-                            item.zks1_balance = balance1;
-                            item.zks1_tx_amount = tx1;
-                            setData([...newData]);
-                            localStorage.setItem('addresses', JSON.stringify(newData));
-                        })
-                    });
-                    promisesQueue.push(() => {
-                        item.eth_balance = null;
-                        return getEthBalance(item.address, "ethereum").then((eth_balance) => {
-                            item.eth_balance = eth_balance;
-                            setData([...newData]);
-                            localStorage.setItem('addresses', JSON.stringify(newData));
-                        })
-                    });
-                    promisesQueue.push(() => {
-                        item.eth_tx_amount = null;
-                        return getTxCount(item.address, "ethereum").then((eth_tx_amount) => {
-                            item.eth_tx_amount = eth_tx_amount;
-                            setData([...newData]);
-                            localStorage.setItem('addresses', JSON.stringify(newData));
-                        })
-                    });
-                    promisesQueue.push(() => {
-                        item.zks2_last_tx = null;
-                        item.totalExchangeAmount = null;
-                        item.totalFee = null;
-                        item.contractActivity = null;
-                        item.dayActivity = null;
-                        item.weekActivity = null;
-                        item.monthActivity = null;
-                        item.l1Tol2Times = null;
-                        item.l1Tol2Amount = null;
-                        item.l2Tol1Times = null;
-                        item.l2Tol1Amount = null;
-                        return getZkSyncBridge(item.address).then(({
-                                                                       zks2_last_tx,
-                                                                       totalExchangeAmount,
-                                                                       totalFee,
-                                                                       contractActivity,
-                                                                       dayActivity,
-                                                                       weekActivity,
-                                                                       monthActivity,
-                                                                       l1Tol2Times,
-                                                                       l1Tol2Amount,
-                                                                       l2Tol1Times,
-                                                                       l2Tol1Amount
-                                                                   }) => {
-                            item.zks2_last_tx = zks2_last_tx;
-                            item.totalExchangeAmount = totalExchangeAmount;
-                            item.totalFee = totalFee;
-                            item.contractActivity = contractActivity;
-                            item.dayActivity = dayActivity;
-                            item.weekActivity = weekActivity;
-                            item.monthActivity = monthActivity;
-                            item.l1Tol2Times = l1Tol2Times;
-                            item.l1Tol2Amount = l1Tol2Amount;
-                            item.l2Tol1Times = l2Tol1Times;
-                            item.l2Tol1Amount = l2Tol1Amount;
-                            setData([...newData]);
-                            localStorage.setItem('addresses', JSON.stringify(newData));
-                        })
-                    });
+                    promisesQueue.push(promiseFunction);
                 }
-                processQueue();
+                // handleSingleRefresh(key)
             }
+            processQueue();
             while (activePromises > 0 || promisesQueue.length > 0) {
                 await new Promise(resolve => setTimeout(resolve, 100));
             }
+            notification.success({
+                message: "完成",
+                description: "刷新地址数据完成",
+                duration: 1,
+            });
         } catch (error) {
             notification.error({
-                message: "错误",
+                message: t('zk_error'),
                 description: error.message,
-            }, 2);
+                duration: 1,
+            });
         } finally {
             setIsLoading(false);
-            setSelectedKeys([]);
-            message.success("刷新成功");
+            if (!singleKey) {
+                setSelectedKeys([]);
+            }
         }
     };
 
@@ -390,13 +172,12 @@ function Zksync() {
             setBatchLoading(true);
             setIsBatchModalVisible(false);
             const values = await batchForm.validateFields();
-            const addresses = values.addresses.split("\n");
-            setBatchLength(addresses.length);
-            const newData = [...data];
-            const limit = 50;
+            const addresses = values['addresses'].split("\n");
+
+            const limit = 5;
             let activePromises = 0;
             let promisesQueue = [];
-            setBatchProgress(0);
+
             const processQueue = () => {
                 while (promisesQueue.length > 0 && activePromises < limit) {
                     const promise = promisesQueue.shift();
@@ -413,115 +194,77 @@ function Zksync() {
                 address = address.trim();
                 if (address.length !== 42) {
                     notification.error({
-                        message: "错误",
-                        description: "请输入正确的地址",
+                        message: t('zk_error'),
+                        description: t('zk_error_msg'),
+                        duration: 1,
                     });
                     continue;
                 }
-                let promiseWithProgress = () => {
-                    return new Promise((resolve, reject) => {
-                        setBatchProgress(prevProgress => prevProgress + 1);
+                const promiseFunction = () => new Promise(async (resolve, reject) => {
+                    try {
+                        setData(prevData => {
+                            const updatedData = [...prevData];
+                            const index = updatedData.findIndex(item => item.address === address);
+                            if (index === -1) {
+                                const newEntry = {
+                                    key: idCounter.toString(),
+                                    address: address,
+                                    result: "pending",
+                                };
+                                idCounter++;
+                                updatedData.push(newEntry);
+                            }
+                            return updatedData;
+                        });
+                        const response = await getAllZksSyncData(address, isGetTustalabsData);
+                        setData(prevData => {
+                            const updatedData = [...prevData];
+                            const index = updatedData.findIndex(item => item.address === address);
+                            if (index !== -1) {
+                                updatedData[index] = {
+                                    ...updatedData[index],
+                                    ...response,
+                                };
+                            }
+                            return updatedData;
+                        });
                         resolve();
-                    });
-                };
-                const index = newData.findIndex(item => item.address === address);
-                const item = index !== -1 ? newData[index] : {
-                    key: newData.length.toString(),
-                    address: address,
-                    eth_balance: null,
-                    eth_tx_amount: null,
-                    zks2_balance: null,
-                    zks2_tx_amount: null,
-                    zks2_usdcBalance: null,
-                    zks1_balance: null,
-                    zks1_tx_amount: null,
-                    zks2_last_tx: null,
-                    dayActivity: null,
-                    weekActivity: null,
-                    monthActivity: null,
-                    l1Tol2Times: null,
-                    l1Tol2Amount: null,
-                    l2Tol1Times: null,
-                    l2Tol1Amount: null,
-                    contractActivity: null,
-                    totalFee: null,
-                    totalExchangeAmount: null,
-                };
-                if (index === -1) {
-                    newData.push(item);
-                }
-                promisesQueue.push(() => getZksEra(address).then(({balance2, tx2, usdcBalance}) => {
-                    item.zks2_balance = balance2;
-                    item.zks2_tx_amount = tx2;
-                    item.zks2_usdcBalance = usdcBalance;
-                }));
+                    } catch (error) {
+                        reject(error);
+                    }
+                });
 
-
-                promisesQueue.push(() => getZksLite(address).then(({balance1, tx1}) => {
-                    item.zks1_balance = balance1;
-                    item.zks1_tx_amount = tx1;
-                }));
-
-                promisesQueue.push(() => getEthBalance(address, "ethereum").then((eth_balance) => {
-                    item.eth_balance = eth_balance;
-                }));
-
-                promisesQueue.push(() => getTxCount(address, "ethereum").then((eth_tx_amount) => {
-                    item.eth_tx_amount = eth_tx_amount;
-                }));
-
-                promisesQueue.push(() => getZkSyncBridge(address).then(({
-                                                                            zks2_last_tx,
-                                                                            totalExchangeAmount,
-                                                                            totalFee,
-                                                                            contractActivity,
-                                                                            dayActivity,
-                                                                            weekActivity,
-                                                                            monthActivity,
-                                                                            l1Tol2Times,
-                                                                            l1Tol2Amount,
-                                                                            l2Tol1Times,
-                                                                            l2Tol1Amount
-                                                                        }) => {
-                    item.zks2_last_tx = zks2_last_tx;
-                    item.totalExchangeAmount = totalExchangeAmount;
-                    item.totalFee = totalFee;
-                    item.contractActivity = contractActivity;
-                    item.dayActivity = dayActivity;
-                    item.weekActivity = weekActivity;
-                    item.monthActivity = monthActivity;
-                    item.l1Tol2Times = l1Tol2Times;
-                    item.l1Tol2Amount = l1Tol2Amount;
-                    item.l2Tol1Times = l2Tol1Times;
-                    item.l2Tol1Amount = l2Tol1Amount;
-                }));
-                promisesQueue.push(promiseWithProgress);
-                processQueue();
-
+                promisesQueue.push(promiseFunction);
             }
+            processQueue();
             while (activePromises > 0 || promisesQueue.length > 0) {
                 await new Promise(resolve => setTimeout(resolve, 100));
             }
-
-            setData(newData);
-            localStorage.setItem('addresses', JSON.stringify(newData));
+            notification.success({
+                message: "成功",
+                description: "批量添加完成",
+                duration: 1,
+            })
         } catch (error) {
             notification.error({
-                message: "错误",
+                message: t('zk_error'),
                 description: error.message,
+                duration: 1,
             });
         } finally {
             setBatchLoading(false);
-            setBatchProgress(0);
             batchForm.resetFields();
             setSelectedKeys([]);
-            message.success("批量添加成功");
         }
     };
-
-
-    const showModal = () => {
-        setIsModalVisible(true);
+    const toggleHideColumn = () => {
+        setHideColumn(!hideColumn);
+    };
+    const getEyeIcon = () => {
+        if (hideColumn) {
+            return <EyeInvisibleOutlined/>;
+        }
+        return <EyeOutlined/>;
     };
     const showBatchModal = () => {
         setIsBatchModalVisible(true);
@@ -529,31 +272,24 @@ function Zksync() {
     const exportToExcelFile = () => {
         exportToExcel(data, 'walletInfo');
     }
-    useEffect(() => {
-        setTableLoading(true);
-        const storedAddresses = localStorage.getItem('addresses');
-        setTimeout(() => {
-            setTableLoading(false);
-        }, 500);
-        if (storedAddresses) {
-            setData(JSON.parse(storedAddresses));
-        }
-    }, []);
-    const handleCancel = () => {
-        setIsModalVisible(false);
-    };
-    const handleDelete = (key) => {
-        setData(data.filter(item => item.key !== key));
-        localStorage.setItem('addresses', JSON.stringify(data.filter(item => item.key !== key)));
+    const handleDelete = async (address) => {
+        setData(data.filter(item => item.address !== address));
+        localStorage.setItem('addresses', JSON.stringify(data.filter(item => item.address !== address)));
+        await deleteData("zkProtocol", [address]);
+        await deleteData("zkTransactions", [address]);
     }
-    const handleDeleteSelected = () => {
+    const handleDeleteSelected = async () => {
         if (!selectedKeys.length) {
             notification.error({
-                message: "错误",
-                description: "请先选择要删除的地址",
-            }, 2);
+                message: t('zk_error'),
+                description: t('zk_error_msg2'),
+                duration: 1
+            });
             return;
         }
+        const addresses = data.filter(item => selectedKeys.includes(item.key)).map(item => item.address);
+        await deleteData("zkTransactions", addresses);
+        await deleteData("zkProtocol", addresses);
         setData(data.filter(item => !selectedKeys.includes(item.key)));
         localStorage.setItem('addresses', JSON.stringify(data.filter(item => !selectedKeys.includes(item.key))));
         setSelectedKeys([]);
@@ -567,20 +303,21 @@ function Zksync() {
     const handleBatchCancel = () => {
         setIsBatchModalVisible(false);
     };
-    useEffect(() => {
-        if(selectedKeys[0] === -1) {
-            handleRefresh()
-        }
-    }, [selectedKeys])
-    const handleSingleRefresh = (e, record) => {
-        e.stopPropagation()
-        setSelectedKeys([-1, record.key]);
-        const newData = [...data];
-        newData[record.key].refresh = +new Date()
-        setData(data)
-    };
-    const [editingKey, setEditingKey] = useState(null);
+    const getProtocol = async (address) => {
+        await initDB(dbConfig)
+        const protocol = await get("zkProtocol", address);
+        console.log(protocol)
+        const protocolData = protocol.data ? JSON.parse(protocol.data) : [];
+        return {address: address, protocols: protocolData} || {address: address, protocols: []};
+    }
     const columns = [
+        {
+            title: "#",
+            key: "index",
+            align: "center",
+            width: 50,
+            render: (text, record, index) => index + 1,
+        },
         {
             title: "最后刷新",
             key: "refresh",
@@ -589,60 +326,83 @@ function Zksync() {
             width: 110,
             render: (text, record) => (
                 <Space size="small">
-                    <Button onClick={(e) => handleSingleRefresh(e, record)} size="small" icon={<ReloadOutlined/>}/>
+                    {/* <Button onClick={(e) => handleSingleRefresh(e, record)} size="small" icon={<ReloadOutlined/>}/> */}
+                    <Button icon={<ReloadOutlined/>} onClick={() => {
+                        handleRefresh(record.key)
+                    }}/>
                     <small>{convertTimeToHumanReadable(text)}</small>
                 </Space>
             ),
         },
         {
-            title: "#",
-            key: "index",
+            title: t("state"),
+            key: "result",
             align: "center",
-            width: 50,
-            render: (text, record, index) => index + 1,
+            render: (text, record) => (
+                <Space>
+                    {record['result'] === "success" ?
+                        <Tag icon={<CheckCircleOutlined/>} color="success">成功</Tag> : null}
+                    {record['result'] === "error" ?
+                        <Tooltip title={record['reason']}>
+                            <Tag icon={<CloseCircleOutlined/>} color="error">失败 </Tag>
+                        </Tooltip> : null}
+                    {record['result'] === "pending" ?
+                        <Tag icon={<SyncOutlined spin/>} color="processing">获取中 </Tag> : null}
+                </Space>
+            )
         },
         // {
-        //     title: "备注",
+        //     title: t("notes"),
         //     dataIndex: "name",
         //     key: "name",
         //     align: "center",
-        //     width: 70,
         //     render: (text, record) => {
-        //         const isEditing = record.key === editingKey;
-        //         return isEditing ? (
-        //             <Input
-        //                 placeholder="请输入备注"
-        //                 defaultValue={text}
-        //                 onPressEnter={(e) => {
-        //                     record.name = e.target.value;
+        //         const displayText = text || <EditOutlined/>;
+        //         return (
+        //             <Popconfirm
+        //                 title={
+        //                     <div>
+        //                         <Input
+        //                             placeholder={"请输入备注"}
+        //                             defaultValue={text}
+        //                             onChange={(e) => {
+        //                                 record.name = e.target.value
+        //                             }}
+        //                             allowClear
+        //                             bordered
+        //                         />
+        //                     </div>
+        //                 }
+        //                 icon={<EditOutlined/>}
+        //                 onConfirm={() => {
         //                     setData([...data]);
         //                     localStorage.setItem('addresses', JSON.stringify(data));
-        //                     setEditingKey(null);
         //                 }}
-        //             />
-        //         ) : (
-        //             <>
-        //                 <Tag color="blue">{text}</Tag>
-        //                 <Button
-        //                     shape="circle"
-        //                     icon={<EditOutlined/>}
-        //                     size={"small"}
-        //                     onClick={() => setEditingKey(record.key)}
-        //                 />
-        //             </>
+        //                 onCancel={() => {
+        //                 }}
+        //                 okText={"确定"}
+        //                 cancelText={"取消"}
+        //             >
+        //                 <Tag color="blue" style={{cursor: "pointer"}}>
+        //                     {displayText}
+        //                 </Tag>
+        //             </Popconfirm>
         //         );
-        //     }
+        //     },
         // },
         {
-            title: "钱包地址",
+            title: '地址',
             dataIndex: "address",
             key: "address",
             align: "center",
-            width: 150,
-            render: (text, record) => {
-                return <Paragraph copyable={{ text }} style={{marginBottom: 0}}>
-                    <Text keyboard type={isRowSatisfyCondition(record) ? "warning" : "secondary"}>{text.slice(0, 5) + "..." + text.slice(-4)}</Text>
-                </Paragraph> || <Spin/>;
+            width: 140,
+            render: (text) => {
+                const displayText = hideColumn ? text.slice(0, 4) + '***' + text.slice(-4) : text;
+                return (
+                    <Paragraph copyable={{text}} style={{whiteSpace: "nowrap", margin: 0}}>
+                        {displayText}
+                    </Paragraph>
+                );
             },
         },
         {
@@ -655,408 +415,508 @@ function Zksync() {
                     dataIndex: "eth_balance",
                     key: "eth_balance",
                     align: "center",
-                    render: (text, record) => (text === null ? <Spin/> : text),
-                    // width: 60
                 },
                 {
                     title: "Tx",
                     dataIndex: "eth_tx_amount",
                     key: "eth_tx_amount",
                     align: "center",
-                    render: (text, record) => (text === null ? <Spin/> : text),
-                    // width: 40
                 },
             ],
         },
         {
-            title: "zkSync Lite",
+            title: "zkSyncLite",
             key: "zks_lite_group",
             className: "zks_lite",
             children: [
                 {
                     title: "ETH",
-                    dataIndex: "zks1_balance",
+                    dataIndex: ['zksLiteBalance', "zks1_balance"],
                     key: "zks1_balance",
                     align: "center",
-                    render: (text, record) => (text === null ? <Spin/> : text),
-                    // width: 60
                 },
                 {
                     title: "Tx",
-                    dataIndex: "zks1_tx_amount",
+                    dataIndex: ['zksLiteBalance', "zks1_tx_amount"],
                     key: "zks1_tx_amount",
                     align: "center",
-                    render: (text, record) => (text === null ? <Spin/> : text),
-                    // width: 34.5
+                    sorter: (a, b) => a.zksLiteBalance.zks1_tx_amount - b.zksLiteBalance.zks1_tx_amount,
                 },
+                {
+                    title: t('last_tx'),
+                    dataIndex: ['zksLiteBalance', "zks1_latest_tx"],
+                    key: "zks1_latest_tx",
+                    align: "center",
+                    width: 90
+                }
             ],
+
         },
         {
-            title: "zkSync Era",
+            title: "zkSyncEra",
             key: "zks_era_group",
             className: "zks_era",
             children: [
                 {
                     title: "ETH",
-                    dataIndex: "zks2_balance",
+                    dataIndex: ['zksEraBalance', "zks2_balance"],
                     key: "zks2_balance",
                     align: "center",
-                    render: (text, record) => (text === null ? <Spin/> : text),
-                    // width: 60
                 },
                 {
                     title: "USDC",
-                    dataIndex: "zks2_usdcBalance",
+                    dataIndex: ['zksEraBalance', "zks2_usdcBalance"],
                     key: "zks2_usdcBalance",
                     align: "center",
-                    render: (text, record) => (text === null ? <Spin/> : text),
-                    // width: 63
                 },
                 {
                     title: "Tx",
-                    dataIndex: "zks2_tx_amount",
+                    dataIndex: ['zksEraBalance', "zks2_tx_amount"],
                     key: "zks2_tx_amount",
                     align: "center",
-                    render: (text, record) => (text === null ? <Spin/> : text),
-                    // width: 34.2
+                    sorter: (a, b) => a.zksEraBalance.zks2_tx_amount - b.zksEraBalance.zks2_tx_amount,
                 },
                 {
-                    title: "最后交易",
-                    dataIndex: "zks2_last_tx",
+                    title: t("last_tx"),
+                    dataIndex: ['activity', "zks2_last_tx"],
                     key: "zks2_last_tx",
                     align: "center",
-                    render: (text, record) => (text === null ? <Spin/> :
+                    width: 90,
+                    render: (text, record) => (
                         <a href={"https://explorer.zksync.io/address/" + record.address}
                            target={"_blank"}>{text}</a>),
-                    width: 80
                 },
                 {
-                    title: "官方桥Tx数",
+                    title: t('official_bridge_tx'),
                     key: "cross_chain_tx_count_group",
                     children: [
                         {
                             title: "L1->L2",
-                            dataIndex: "l1Tol2Times",
+                            dataIndex: ['bridge', "l1Tol2Times"],
                             key: "l1Tol2Times",
                             align: "center",
-                            render: (text, record) => (text === null ? <Spin/> : text),
                             width: 60
                         },
                         {
                             title: "L2->L1",
-                            dataIndex: "l2Tol1Times",
+                            dataIndex: ['bridge', "l2Tol1Times"],
                             key: "l2Tol1Times",
                             align: "center",
-                            render: (text, record) => (text === null ? <Spin/> : text),
                             width: 60
                         },
                     ],
                 },
                 {
-                    title: "官方桥金额(E)",
+                    title: t('official_bridge_amount'),
                     key: "cross_chain_amount_group",
                     children: [
                         {
                             title: "L1->L2",
-                            dataIndex: "l1Tol2Amount",
+                            dataIndex: ['bridge', "l1Tol2Amount"],
                             key: "l1Tol2Amount",
                             align: "center",
-                            render: (text, record) => (text === null ? <Spin/> : text),
-                            width: 75
+                            width: 80
                         },
                         {
                             title: "L2->L1",
-                            dataIndex: "l2Tol1Amount",
+                            dataIndex: ['bridge', "l2Tol1Amount"],
                             key: "l2Tol1Amount",
                             align: "center",
-                            render: (text, record) => (text === null ? <Spin/> : text),
-                            width: 75
+                            width: 80
                         },
                     ],
                 },
                 {
-                    title: "活跃统计",
+                    title: t('activities'),
                     key: "activity_stats_group",
                     children: [
                         {
-                            title: "日",
-                            dataIndex: "dayActivity",
+                            title: t('day'),
+                            dataIndex: ['activity', "dayActivity"],
                             key: "dayActivity",
                             align: "center",
-                            render: (text, record) => (text === null ? <Spin/> : text),
-                            // width: 34
                         },
                         {
-                            title: "周",
-                            dataIndex: "weekActivity",
+                            title: t('week'),
+                            dataIndex: ['activity', "weekActivity"],
                             key: "weekActivity",
                             align: "center",
-                            render: (text, record) => (text === null ? <Spin/> : text),
-                            // width: 34
                         },
                         {
-                            title: "月",
-                            dataIndex: "monthActivity",
+                            title: t('month'),
+                            dataIndex: ['activity', "monthActivity"],
                             key: "monthActivity",
                             align: "center",
-                            render: (text, record) => (text === null ? <Spin/> : text),
-                            // width: 34
                         },
                         {
-                            title: "不同合约",
-                            dataIndex: "contractActivity",
+                            title: t('contract'),
+                            dataIndex: ['activity', "contractActivity"],
                             key: "contractActivity",
                             align: "center",
-                            render: (text, record) => (text === null ? <Spin/> : text),
-                            width: 74
                         },
                         {
-                            title: "金额(U)",
+                            title: t('amount'),
                             dataIndex: "totalExchangeAmount",
                             key: "totalExchangeAmount",
                             align: "center",
                             width: 90,
-                            render: (text, record) => (text === null ? <Spin/> : text),
+                            sorter: (a, b) => a.totalExchangeAmount - b.totalExchangeAmount,
                         },
                         {
-                            title: "FeeΞ",
+                            title: t('fee'),
                             dataIndex: "totalFee",
                             key: "totalFee",
                             align: "center",
-                            render: (text, record) => (text === null ? <Spin/> : text),
-                            width: 62
                         }
                     ],
                 },
             ],
         },
+        // {
+        //     title: (
+        //         <span>
+        //             <Space>
+        //             <span>Trustalabs</span>
+        //             <Checkbox
+        //                 checked={isGetTustalabsData}
+        //                 onChange={(e) => {
+        //                     setIsGetTustalabsData(e.target.checked);
+        //                     localStorage.setItem('isGetTustalabsData', e.target.checked);
+        //                 }}/>
+        //                 </Space>
+        //         </span>
+        //     ),
+        //     key: 'trustData',
+        //     className: "trustData",
+        //     children: [
+        //         {
+        //             title: t('score'),
+        //             key: 'score',
+        //             dataIndex: ['trustData', 'score'],
+        //             align: 'center',
+        //             sorter: (a, b) => a.trustData.score - b.trustData.score,
+        //         },
+        //         {
+        //             title: t('rank'),
+        //             key: 'rank',
+        //             dataIndex: ['trustData', 'rank'],
+        //             align: 'center',
+        //             sorter: (a, b) => a.trustData.rank - b.trustData.rank,
+        //         },
+        //         {
+        //             title: 'Top',
+        //             key: 'top',
+        //             dataIndex: ['trustData', 'top'],
+        //             align: 'center',
+        //             render: (text) => (text !== "-" && text ? text.toString() + "%" : text),
+        //             sorter: (a, b) => a.trustData.top - b.trustData.top,
+        //         }
+        //     ]
+        // },
+        // {
+        //     title: "NFT是否可领",
+        //     key: "nft",
+        //     align: "center",
+        //     dataIndex: "isCanClaim",
+        //     render: (text) => (
+        //         <Space>
+        //             {text && text === "yes" ? <Tag color="success">是</Tag> : null}
+        //             {text && text === "no" ? <Tag color="error">否</Tag> : null}
+        //             {text && text === "error" ? <Tag color="error">获取失败</Tag> : null}
+        //         </Space>
+        //     )
+        // },
         {
-            title: "操作",
+            title: t('operation'),
             key: "action",
             align: "center",
-            width: 70,
             render: (text, record) => (
                 <Space size="small">
-                    <Popconfirm title={"确认删除？"} onConfirm={() => handleDelete(record.key)}>
-                        <Button size="small" icon={<DeleteOutlined/>}/>
+                    <Popconfirm title={t('zk_message_confirm_delete')} onConfirm={async () => {
+                        await handleDelete(record.address)
+                    }}>
+                        <Button icon={<DeleteOutlined/>}/>
                     </Popconfirm>
+                    {/* <Button icon={<SearchOutlined/>} onClick={() => {
+                        setShowAddressDetailModal(record.address)
+                        getProtocol(record.address).then((res) => {
+                            setAddressDetail(res)
+                        })
+                    }
+
+                    }/> */}
                 </Space>
             ),
         },
     ];
-    const handleWalletOk = () => {
-        const values = walletForm.getFieldsValue();
-        localStorage.setItem('zksync_config', JSON.stringify(values));
-        setZkSyncConfigStore(values);
-        setIsWalletModalVisible(false);
-        console.log(zkSyncConfigStore)
+    const addressDetailColumns = [
+        {
+            title: '',
+            dataIndex: 'logo',
+            key: 'logo',
+            align: 'center',
+            render: (text, record) => (
+                <img src={'/protocol/' + record.id + '.png'} style={{width: '20px', height: '20px'}} alt={record.id}/>
+            ),
+        },
+        {
+            title: t('protocol'),
+            dataIndex: 'name',
+            key: 'name',
+            align: 'center',
+            render: (text, record) => (
+                <a href={record.url} target="_blank" rel="noopener noreferrer">
+                    {text}
+                </a>
+            ),
+        },
+        {
+            title: 'tx',
+            dataIndex: 'interactions',
+            key: 'interactions',
+            sorter: (a, b) => a.interactions - b.interactions,
+            align: 'center',
+        },
+        {
+            title: t('last_tx'),
+            dataIndex: 'lastActivity',
+            key: 'lastActivity',
+            align: 'center',
+            render: (text) => (text === '' ? '无' : new Date(text).toLocaleString('zh-CN', {timeZone: 'Asia/Shanghai'})),
+        },
+        {
+            title: t('amount'),
+            dataIndex: 'volume',
+            key: 'volume',
+            align: 'center',
+            sorter: (a, b) => a.volume - b.volume,
+            defaultSortOrder: 'descend',
+            render: (text) => (Number(text).toFixed(2)),
+        }
+    ]
+
+    function formatNumber(number, decimals = 3) {
+        return number === 0 ? '0' : number.toFixed(decimals);
+    }
+
+    const centeredTextStyle = {
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100%',
+        width: '100%',
     };
-    const FormItem = ({name, addonBefore, addonAfter}) => (
-        <Form.Item name={name}>
-            <InputNumber min={0} style={{width: '100%'}}
-                         addonBefore={addonBefore} addonAfter={addonAfter}
-            />
-        </Form.Item>
-    );
-    const isRowSatisfyCondition = (record) => {
-        const conditionKeyMapping = {
-            "ETHTx": "eth_tx_amount",
-            "zkSyncLiteMinTx": "zks1_tx_amount",
-            "zkSyncEraMinTx": "zks2_tx_amount",
-            "L1ToL2Tx": "l1Tol2Times",
-            "L2ToL1Tx": "l2Tol1Times",
-            "L1ToL2ETH": "l1Tol2Amount",
-            "L2ToL1ETH": "l2Tol1Amount",
-            "contractMin": "contractActivity",
-            "dayMin": "dayActivity",
-            "weekMin": "weekActivity",
-            "monthMin": "monthActivity",
-            "gasFee": "totalFee",
-            "totalAmount": "totalExchangeAmount",
-        };
-        return Object.keys(conditionKeyMapping).every((conditionKey) => {
-            if (!(conditionKey in zkSyncConfigStore) || zkSyncConfigStore[conditionKey] === null || zkSyncConfigStore[conditionKey] === undefined) {
-                return true;
-            }
-            const recordKey = conditionKeyMapping[conditionKey];
-            return Number(record[recordKey]) >= Number(zkSyncConfigStore[conditionKey])
+
+    const tableSummary = (pageData) => {
+        let totalEthBalance = 0;
+        let totalZkLiteEthBalance = 0;
+        let totalZkEraEthBalance = 0;
+        let totalZkEraUsdcBalance = 0;
+        let totalL1Tol2Amount = 0;
+        let totalL2Tol1Amount = 0;
+        let totalAmount = 0;
+        let totalFee = 0;
+
+        pageData.forEach((row) => {
+            totalEthBalance += parseFloat(row.eth_balance || 0);
+            totalZkLiteEthBalance += parseFloat(row.zksLiteBalance?.zks1_balance || 0);
+            totalZkEraEthBalance += parseFloat(row.zksEraBalance?.zks2_balance || 0);
+            totalZkEraUsdcBalance += parseFloat(row.zksEraBalance?.zks2_usdcBalance || 0);
+            totalL1Tol2Amount += parseFloat(row.bridge?.l1Tol2Amount || 0);
+            totalL2Tol1Amount += parseFloat(row.bridge?.l2Tol1Amount || 0);
+            totalAmount += parseFloat(row.totalExchangeAmount || 0);
+            totalFee += parseFloat(row.totalFee || 0);
         });
+
+        return (
+            <Table.Summary>
+                <Table.Summary.Row>
+                    <Table.Summary.Cell index={0}>
+                        <div style={centeredTextStyle}>
+                            <Text type={"danger"}>总计</Text>
+                        </div>
+                    </Table.Summary.Cell>
+                    <Table.Summary.Cell index={1}/>
+                    <Table.Summary.Cell index={2}/>
+                    <Table.Summary.Cell index={3}/>
+                    <Table.Summary.Cell index={24}/>
+                    <Table.Summary.Cell index={4}>
+                        <div style={centeredTextStyle}>
+                            <Text type="danger">{formatNumber(totalEthBalance)}</Text>
+                        </div>
+                    </Table.Summary.Cell>
+                    <Table.Summary.Cell index={5}/>
+                    <Table.Summary.Cell index={6}>
+                        <div style={centeredTextStyle}>
+                            <Text type="danger">
+                                {formatNumber(totalZkLiteEthBalance)}
+                            </Text>
+                        </div>
+                    </Table.Summary.Cell>
+                    <Table.Summary.Cell index={7}/>
+                    <Table.Summary.Cell index={8}/>
+                    <Table.Summary.Cell index={9}>
+                        <div style={centeredTextStyle}>
+                            <Text type="danger">
+                                {formatNumber(totalZkEraEthBalance)}
+                            </Text>
+                        </div>
+                    </Table.Summary.Cell>
+                    <Table.Summary.Cell index={10}>
+                        <div style={centeredTextStyle}>
+                            <Text type="danger">
+                                {formatNumber(totalZkEraUsdcBalance, 2)}
+                            </Text>
+                        </div>
+                    </Table.Summary.Cell>
+                    <Table.Summary.Cell index={11}/>
+                    <Table.Summary.Cell index={12}/>
+                    <Table.Summary.Cell index={13}/>
+                    <Table.Summary.Cell index={14}/>
+                    <Table.Summary.Cell index={15}>
+                        <div style={centeredTextStyle}>
+                            <Text type="danger">
+                                {formatNumber(totalL1Tol2Amount)}
+                            </Text>
+                        </div>
+                    </Table.Summary.Cell>
+                    <Table.Summary.Cell index={16}>
+                        <div style={centeredTextStyle}>
+                            <Text type="danger">
+                                {formatNumber(totalL2Tol1Amount)}
+                            </Text>
+                        </div>
+                    </Table.Summary.Cell>
+                    <Table.Summary.Cell index={17}/>
+                    <Table.Summary.Cell index={18}/>
+                    <Table.Summary.Cell index={19}/>
+                    <Table.Summary.Cell index={20}/>
+                    <Table.Summary.Cell index={21}>
+                        <div style={centeredTextStyle}>
+                            <Text type="danger">
+                                {formatNumber(totalAmount, 2)}
+                            </Text>
+                        </div>
+                    </Table.Summary.Cell>
+                    <Table.Summary.Cell index={22}>
+                        <div style={centeredTextStyle}>
+                            <Text type="danger">
+                                {formatNumber(totalFee, 2)}
+                            </Text>
+                        </div>
+                    </Table.Summary.Cell>
+                    {/* <Table.Summary.Cell index={23}/> */}
+                    {/* <Table.Summary.Cell index={24}/> */}
+                    <Table.Summary.Cell index={25}/>
+                </Table.Summary.Row>
+            </Table.Summary>
+        );
     };
 
     return (
         <div>
             <Content>
-                <Modal title="批量添加地址" open={isBatchModalVisible} onOk={handleBatchOk}
+                <EcosystemModal open={ecosystemModalVisible} onCancel={() => setEcosystemModalVisible(false)}/>
+                <Modal
+                    title={addressDetail && addressDetail.address + '  ' + t('address_detail')}
+                    open={showAddressDetailModal !== null}
+                    onCancel={() => setShowAddressDetailModal(null)}
+                    footer={null}
+                    width={1000}
+                    centered={true}
+                    bodyStyle={{height: '500px', overflow: 'auto'}}
+                >
+                    <div>
+                        {addressDetail && (
+                            <Table
+                                columns={addressDetailColumns}
+                                dataSource={addressDetail.protocols}
+                                pagination={false}
+                                defaultSortOrder="descend"
+                                size={"small"}
+                            />
+                        )}
+                    </div>
+                </Modal>
+                <Modal title={t('batch_add_address')} open={isBatchModalVisible} onOk={handleBatchOk}
                        onCancel={handleBatchCancel}
                        okButtonProps={{loading: isLoading}}
-                       okText={"添加地址"}
-                       cancelText={"取消"}
-                    // style={{zIndex: 3}}
+                       okText={"OK"}
+                       cancelText={"Cancel"}
                 >
                     <Form form={batchForm} layout="vertical">
-                        <Form.Item label="地址" name="addresses" rules={[{required: true}]}>
-                            <TextArea placeholder="请输入地址，每行一个" style={{width: "500px", height: "200px"}}/>
+                        <Form.Item label={t('address')} name="addresses" rules={[{required: true}]}>
+                            <TextArea placeholder={t('zk_msg')} style={{width: "500px", height: "200px"}}/>
                         </Form.Item>
                     </Form>
                 </Modal>
-                <Modal title="添加地址" open={isModalVisible} onOk={handleOk} onCancel={handleCancel}
-                       okButtonProps={{loading: isLoading}}
-                       okText={"添加地址"}
-                       cancelText={"取消"}
-                    // style={{zIndex: 3}}
-                >
-                    <Form form={form} layout="vertical">
-                        <Form.Item label="地址" name="address" rules={[{required: true}]}>
-                            <Input placeholder="请输入地址"/>
-                        </Form.Item>
-                        <Form.Item label="备注" name="name">
-                            <Input placeholder="请输入备注"/>
-                        </Form.Item>
-                    </Form>
-                </Modal>
-                <Modal title="zkSync"
-                       open={isWalletModalVisible}
-                       onOk={handleWalletOk}
-                       onCancel={() => {
-                           setIsWalletModalVisible(false);
-                       }}
-                       okText={"保存"}
-                       cancelText={"取消"}
-                       width={700}
-                       style={{top: 10}}
-                    // style={{zIndex: 3}}
-
-                >
-                    <Form form={walletForm} layout="vertical">
-                        <Card title="设置钱包预期标准，若钱包达到设置标准，钱包地址会为橙色，更清晰"
-                              bordered={true}
-                              style={{width: '100%'}}>
-                            <Row gutter={[16, 16]}>
-                                <Col span={12}>
-                                    <FormItem name="ETHTx" addonBefore="ETH Tx数量 ≥ "
-                                              addonAfter="个"/>
-                                    <FormItem name="zkSyncLiteMinTx" addonBefore="zkSync Lite Tx数 ≥ "
-                                              addonAfter="个"/>
-                                    <FormItem name="zkSyncEraMinTx" addonBefore="zkSync Era Tx数 ≥ "
-                                              addonAfter="个"/>
-                                    <FormItem name="dayMin" addonBefore="日活跃数 ≥ " addonAfter="天"/>
-                                    <FormItem name="weekMin" addonBefore="周活跃数 ≥ " addonAfter="周"/>
-                                    <FormItem name="monthMin" addonBefore="月活跃数 ≥ " addonAfter="月"/>
-                                </Col>
-                                <Col span={12}>
-                                    <FormItem name="L1ToL2Tx" addonBefore="L1->L2跨链Tx ≥ " addonAfter="个"/>
-                                    <FormItem name="L2ToL1Tx" addonBefore="L2->L1跨链Tx ≥ " addonAfter="个"/>
-                                    <FormItem name="L1ToL2ETH" addonBefore="L1->L2跨链金额 ≥ " addonAfter="ETH"/>
-                                    <FormItem name="L2ToL1ETH" addonBefore="L2->L1跨链金额 ≥ " addonAfter="ETH"/>
-                                    <FormItem name="gasFee" addonBefore="消耗gasFee" addonAfter="ETH"/>
-                                    <FormItem name="contractMin" addonBefore="不同合约数 ≥ " addonAfter="个"/>
-                                    <FormItem name="totalAmount" addonBefore="总交易金额 ≥ " addonAfter="U"/>
-                                </Col>
-                            </Row>
-                        </Card>
-                    </Form>
-                </Modal>
-                <Spin spinning={tableLoading}>
-                    <Table
-                        rowSelection={rowSelection}
-                        dataSource={data}
-                        pagination={false}
-                        bordered={true}
-                        style={{marginBottom: "100px", zIndex: 2}}
-                        size={"small"}
-                        columns={columns}
-                        sticky
-                        summary={pageData => {
-                            let ethBalance = 0;
-                            let zks1Balance = 0;
-                            let zks2Balance = 0;
-                            let zks2UsdcBalance = 0;
-                            let totalFees = 0;
-                            pageData.forEach(({
-                                                  eth_balance,
-                                                  zks1_balance,
-                                                  zks2_balance,
-                                                  zks2_usdcBalance,
-                                                  totalFee
-                                              }) => {
-                                ethBalance += Number(eth_balance);
-                                zks1Balance += Number(zks1_balance);
-                                zks2Balance += Number(zks2_balance);
-                                zks2UsdcBalance += Number(zks2_usdcBalance);
-                                totalFees += Number(totalFee);
-                            })
-
-                            const emptyCells = Array(10).fill().map((_, index) => <Table.Summary.Cell
-                                index={index + 6} key={index}/>);
-
-                            return (
-                                <>
-                                    <Table.Summary.Row>
-                                        <Table.Summary.Cell index={0} colSpan={4}>总计</Table.Summary.Cell>
-                                        <Table.Summary.Cell index={4}>{ethBalance.toFixed(4)}</Table.Summary.Cell>
-                                        <Table.Summary.Cell index={5}/>
-                                        <Table.Summary.Cell index={6}>{zks1Balance.toFixed(4)}</Table.Summary.Cell>
-                                        <Table.Summary.Cell index={7}/>
-                                        <Table.Summary.Cell index={8}>{zks2Balance.toFixed(4)}</Table.Summary.Cell>
-                                        <Table.Summary.Cell
-                                            index={9}>{zks2UsdcBalance.toFixed(2)}</Table.Summary.Cell>
-                                        {emptyCells}
-                                        <Table.Summary.Cell index={19}/>
-                                        <Table.Summary.Cell index={20}>{totalFees.toFixed(4)}</Table.Summary.Cell>
-                                    </Table.Summary.Row>
-                                </>
-                            )
-                        }}
-
-                    />
-                </Spin>
-            </Content>
-            <Card style={{
-                position: 'fixed',
-                bottom: '45px',
-                zIndex: 9,
-                width: '100%'
-            }}>
-                <div style={{
-                    width: '100%',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    gap: '10px'
-                }}>
-                    <Button onClick={() => {
-                        setIsWalletModalVisible(true)
-                    }} size={"large"} style={{width: "20%"}}
-                            icon={<SettingOutlined/>}>
-                        配置
-                    </Button>
-                    <Button type="primary" onClick={showModal} size={"large"} style={{width: "20%"}}
-                            icon={<PlusOutlined/>}>
-                        添加地址
-                    </Button>
-                    <Button type="primary" onClick={showBatchModal} size={"large"}
-                            style={{width: "20%"}}
-                            icon={<UploadOutlined/>}
-                            loading={batchloading}
-                    >
-                        {batchloading ? `添加中 进度:(${batchProgress}/${batchLength})` : "批量添加地址"}
-                    </Button>
-                    <Button disabled={!selectedKeys.length} type="primary" ghost onClick={handleRefresh} loading={isLoading}
-                            size={"large"}
-                            style={{width: "20%"}} icon={<SyncOutlined/>}>
-                        {isLoading ? "正在刷新" : "刷新选中地址"}
-                    </Button>
-                    <Popconfirm title={"确认删除" + selectedKeys.length + "个地址？"}
-                                onConfirm={handleDeleteSelected}>
-                        <Button disabled={!selectedKeys.length} type="primary" danger size={"large"}
-                                icon={<DeleteOutlined/>}>
-                            删除选中地址
-                        </Button>
-                    </Popconfirm>
-                    <Button type="primary" icon={<DownloadOutlined/>} size={"large"}
-                            style={{width: "8%"}}
-                            onClick={exportToExcelFile}/>
+                <div style={{marginBottom: "50px"}}>
+                    <Spin spinning={tableLoading} size={"small"}>
+                        <Table
+                            sticky
+                            rowKey={record => record.key}
+                            rowSelection={rowSelection}
+                            dataSource={data}
+                            pagination={false}
+                            bordered={true}
+                            style={{marginBottom: "120px", zIndex: 2}}
+                            size={"small"}
+                            columns={columns}
+                            summary={tableSummary}
+                        />
+                    </Spin>
                 </div>
-            </Card>
+                <div className="zks_footer"  style={{
+                    position: 'fixed',
+                    bottom: '45px',
+                    zIndex: 9,
+                    width: '100%'
+                }}>
+                    <Card size={"small"} >
+                        <div style={{
+                            width: '100%',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            gap: '20px',
+                        }}>
+                            {/* <Button type="primary"
+                                    onClick={() => {
+                                        setEcosystemModalVisible(true)
+                                    }}
+                                    size="large"
+                                    style={{flex: 1}}
+                                    icon={<AppstoreAddOutlined/>}
+                            >
+                                <span style={{color: 'white'}}>{t('ecosystem')}</span>
+                            </Button> */}
+                            <Button type="primary" onClick={showBatchModal} size={"large"}
+                                    style={{flex: 1}}
+                                    icon={<UploadOutlined/>}
+                                    loading={batchloading}
+                            >
+                                {batchloading ? t('adding') : t('batch_add_address')}
+                            </Button>
+                            <Button type="primary" onClick={() => handleRefresh()} loading={isLoading}
+                                    size={"large"}
+                                    style={{flex: 1}} icon={<SyncOutlined/>}>
+                                {isLoading ? t('refreshing') : t('refresh_selected_address')}
+                            </Button>
+                            <Popconfirm title={t('confirm_delete') + selectedKeys.length + t('address_count') + "?"}
+                                        onConfirm={async () => {
+                                            await handleDeleteSelected()
+                                        }}>
+                                <Button type="primary" danger size={"large"}
+                                        style={{flex: 1}} icon={<DeleteOutlined/>}>
+                                    {t('delete_selected_address')}
+                                </Button>
+                            </Popconfirm>
+                            <Button type="primary" icon={<DownloadOutlined/>} size={"large"}
+                                    style={{flex: 1}}
+                                    onClick={exportToExcelFile}/>
+                        </div>
+                    </Card>
+                </div>
+            </Content>
         </div>
     );
 }

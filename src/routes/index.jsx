@@ -2,47 +2,52 @@ import React, {Suspense} from "react";
 
 
 import {Navigate, useRoutes} from "react-router-dom";
+import StarkInfo from "@pages/StarkInfo/index.jsx";
+import Linea from "@pages/Linea/index.jsx";
 
 const Zksync = React.lazy(() => import("@pages/Zksync"));
-const App = React.lazy(() => import("@/App"));
 const MainPage = React.lazy(() => import("@pages/MainPage"));
 const Stark = React.lazy(() => import("@pages/Stark"));
 const Layer = React.lazy(() => import("@pages/Layer"));
-const Mirror = React.lazy(() => import("@pages/Mirror"));
 const Coffee = React.lazy(() => import("@pages/Coffee"));
-const Deposit = React.lazy(() => import("@pages/Deposit"));
+const ZkInfo = React.lazy(() => import("@pages/ZkInfo"));
+const Setting = React.lazy(() => import("@pages/Setting"));
 const router = [
     {
         path: '/', element: <MainPage/>,
         children: [
-            // {
-            //     path: '/',
-            //     element: < App/>,
-            // },
             {
                 path: '/zksync',
                 element: <Zksync/>,
             },
             {
-                path: '/starknet',
+                path: '/zk_info',
+                element: <ZkInfo/>
+            },
+            {
+                path: '/stark',
                 element: <Stark/>,
             },
-            // {
-            //     path: '/layerzero',
-            //     element: <Layer/>,
-            // },
-            // {
-            //     path: '/mirror',
-            //     element: <Mirror/>,
-            // },
-            // {
-            //     path: '/coffee',
-            //     element: <Coffee/>,
-            // },
-            // {
-            //     path: '/deposit',
-            //     element: <Deposit/>,
-            // }
+            {
+                path: '/stark_info',
+                element: <StarkInfo/>
+            },
+            {
+                path: '/linea',
+                element: <Linea/>
+            },
+            {
+                path: '/Layer',
+                element: <Layer/>,
+            },
+            {
+                path: '/coffee',
+                element: <Coffee/>,
+            },
+            {
+                path: '/setting',
+                element: <Setting/>
+            }
         ]
     },
     {path: "*", element: <Navigate to="/"/>},

@@ -1,6 +1,6 @@
 import React from 'react';
-import {Layout, Typography, Button, message, Space} from 'antd';
-import {QrcodeOutlined, CopyOutlined} from '@ant-design/icons';
+import {Layout, Typography, Button, message, Space, Image} from 'antd';
+import {CopyOutlined} from '@ant-design/icons';
 import QRCode from 'qrcode.react';
 import copy from 'copy-to-clipboard';
 
@@ -15,21 +15,37 @@ const Coffee = () => {
         flexDirection: 'column',
         justifyContent: 'center',
         alignItems: 'center',
-        height: 'calc(100vh - 64px)', // Subtracting Header height
-        padding: '20px',
-        backgroundColor: '#F0F2F5' // Adding a light grey background color
+        height: 'calc(100vh - 64px)',
+        padding: '40px',
+        backgroundColor: '#F5F5F5' // 更柔和的背景色
     };
 
     const qrCodeStyle = {
         marginTop: '20px',
         marginBottom: '20px',
-        padding: '20px',
-        backgroundColor: '#fff', // Adding a white background to the QR code
-        borderRadius: '8px' // Adding some rounded corners to the QR code background
+        padding: '30px',
+        backgroundColor: '#fff',
+        borderRadius: '15px',
+        boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.1)' // 添加阴影
     };
 
     const textStyle = {
-        marginBottom: '20px' // Adding some space below the text
+        marginBottom: '30px', // 增加间距
+        color: '#333' // 深色文本
+    };
+
+    const imageStyle = {
+        marginLeft: '10px',
+        borderRadius: '50%',
+        verticalAlign: 'middle',
+        position: 'relative',
+        top: '-4px'
+    };
+
+    const buttonStyle = {
+        backgroundColor: '#FFA726', // 按钮颜色
+        borderColor: '#FFA726',
+        color: '#fff'
     };
 
     const copyAddress = () => {
@@ -40,11 +56,13 @@ const Coffee = () => {
     return (
         <Layout>
             <Content style={contentStyle}>
-                <Title level={3} style={textStyle}>如果你觉得这款工具对你有所帮助，可以请作者喝杯咖啡提提神吗😄</Title>
+                <Title level={3} style={textStyle}>捐赠作者一杯咖啡
+                    <Image src="/coffee.jpg" width={30} preview={false} style={imageStyle}/>
+                </Title>
                 <div style={textStyle}>
                     <Space>
                         <Text><strong>EVM地址：</strong>{ethAddress}</Text>
-                        <Button icon={<CopyOutlined/>} onClick={copyAddress}></Button>
+                        <Button icon={<CopyOutlined/>} style={buttonStyle} onClick={copyAddress}>复制</Button>
                     </Space>
                 </div>
                 <div style={qrCodeStyle}>
