@@ -4,10 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="5a2ed29f-b121-4294-8dc7-57e650935fb3" name="更改" comment="fix: 修复stark查询错误">
-      <change beforePath="$PROJECT_DIR$/src/utils/zksync/getZkSyncBridge.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/utils/zksync/getZkSyncBridge.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/utils/zksync/getZksEra.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/utils/zksync/getZksEra.js" afterDir="false" />
-    </list>
+    <list default="true" id="5a2ed29f-b121-4294-8dc7-57e650935fb3" name="更改" comment="fix: 修复stark查询错误" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -82,6 +79,7 @@
       <updated>1697287958341</updated>
       <workItem from="1697287959595" duration="3513000" />
       <workItem from="1697336892359" duration="541000" />
+      <workItem from="1697352953775" duration="594000" />
     </task>
     <task id="LOCAL-00001" summary="fix: 修复stark查询错误">
       <option name="closed" value="true" />

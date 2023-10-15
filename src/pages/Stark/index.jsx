@@ -84,7 +84,7 @@ const Stark = () => {
             render: (text, record) => (
                 <Space size="small">
                     {/* <Button onClick={(e) => handleSingleRefresh(e, record)} size="small" icon={<ReloadOutlined/>}/> */}
-                    <Button icon={<ReloadOutlined/>} onClick={() => {
+                    <Button icon={<ReloadOutlined/>} size='small' onClick={() => {
                         handleRefresh(record.key)
                     }}/>
                     <small>{convertTimeToHumanReadable(text)}</small>
@@ -304,7 +304,7 @@ const Stark = () => {
                             <Popconfirm title={"确认删除？"} onConfirm={async () => {
                                 await handleDelete(record.address)
                             }}>
-                                <Button icon={<DeleteOutlined/>}/>
+                                <Button size='small' icon={<DeleteOutlined/>}/>
                             </Popconfirm>
                             {/* <Button icon={<ReloadOutlined/>} onClick={() => {
                                 handleRefresh(record.key)
