@@ -330,7 +330,7 @@ function Zksync() {
                     <Button icon={<ReloadOutlined/>} size='small' onClick={() => {
                         handleRefresh(record.key)
                     }}/>
-                    <small>{convertTimeToHumanReadable(text)}</small>
+                    <small>{record['result'] === "pending" ? '刷新中...' : convertTimeToHumanReadable(text)}</small>
                 </Space>
             ),
         },
@@ -442,13 +442,13 @@ function Zksync() {
                     align: "center",
                     sorter: (a, b) => a.zksLiteBalance.zks1_tx_amount - b.zksLiteBalance.zks1_tx_amount,
                 },
-                {
-                    title: t('last_tx'),
-                    dataIndex: ['zksLiteBalance', "zks1_latest_tx"],
-                    key: "zks1_latest_tx",
-                    align: "center",
-                    width: 90
-                }
+                // {
+                //     title: t('last_tx'),
+                //     dataIndex: ['zksLiteBalance', "zks1_latest_tx"],
+                //     key: "zks1_latest_tx",
+                //     align: "center",
+                //     width: 90
+                // }
             ],
 
         },
@@ -754,7 +754,7 @@ function Zksync() {
                         </div>
                     </Table.Summary.Cell>
                     <Table.Summary.Cell index={7}/>
-                    <Table.Summary.Cell index={8}/>
+                    {/* <Table.Summary.Cell index={8}/> */}
                     <Table.Summary.Cell index={9}>
                         <div style={centeredTextStyle}>
                             <Text type="danger">
