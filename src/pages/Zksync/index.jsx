@@ -440,7 +440,7 @@ function Zksync() {
                     dataIndex: ['zksLiteBalance', "zks1_tx_amount"],
                     key: "zks1_tx_amount",
                     align: "center",
-                    sorter: (a, b) => a.zksLiteBalance.zks1_tx_amount - b.zksLiteBalance.zks1_tx_amount,
+                    // sorter: (a, b) => a.zksLiteBalance.zks1_tx_amount - b.zksLiteBalance.zks1_tx_amount,
                 },
                 // {
                 //     title: t('last_tx'),
@@ -474,7 +474,7 @@ function Zksync() {
                     dataIndex: ['zksEraBalance', "zks2_tx_amount"],
                     key: "zks2_tx_amount",
                     align: "center",
-                    sorter: (a, b) => a.zksEraBalance.zks2_tx_amount - b.zksEraBalance.zks2_tx_amount,
+                    // sorter: (a, b) => a.zksEraBalance.zks2_tx_amount - b.zksEraBalance.zks2_tx_amount,
                 },
                 {
                     title: t("last_tx"),
@@ -560,7 +560,7 @@ function Zksync() {
                             key: "totalExchangeAmount",
                             align: "center",
                             width: 90,
-                            sorter: (a, b) => a.totalExchangeAmount - b.totalExchangeAmount,
+                            // sorter: (a, b) => a.totalExchangeAmount - b.totalExchangeAmount,
                         },
                         {
                             title: t('fee'),
@@ -572,60 +572,6 @@ function Zksync() {
                 },
             ],
         },
-        // {
-        //     title: (
-        //         <span>
-        //             <Space>
-        //             <span>Trustalabs</span>
-        //             <Checkbox
-        //                 checked={isGetTustalabsData}
-        //                 onChange={(e) => {
-        //                     setIsGetTustalabsData(e.target.checked);
-        //                     localStorage.setItem('isGetTustalabsData', e.target.checked);
-        //                 }}/>
-        //                 </Space>
-        //         </span>
-        //     ),
-        //     key: 'trustData',
-        //     className: "trustData",
-        //     children: [
-        //         {
-        //             title: t('score'),
-        //             key: 'score',
-        //             dataIndex: ['trustData', 'score'],
-        //             align: 'center',
-        //             sorter: (a, b) => a.trustData.score - b.trustData.score,
-        //         },
-        //         {
-        //             title: t('rank'),
-        //             key: 'rank',
-        //             dataIndex: ['trustData', 'rank'],
-        //             align: 'center',
-        //             sorter: (a, b) => a.trustData.rank - b.trustData.rank,
-        //         },
-        //         {
-        //             title: 'Top',
-        //             key: 'top',
-        //             dataIndex: ['trustData', 'top'],
-        //             align: 'center',
-        //             render: (text) => (text !== "-" && text ? text.toString() + "%" : text),
-        //             sorter: (a, b) => a.trustData.top - b.trustData.top,
-        //         }
-        //     ]
-        // },
-        // {
-        //     title: "NFT是否可领",
-        //     key: "nft",
-        //     align: "center",
-        //     dataIndex: "isCanClaim",
-        //     render: (text) => (
-        //         <Space>
-        //             {text && text === "yes" ? <Tag color="success">是</Tag> : null}
-        //             {text && text === "no" ? <Tag color="error">否</Tag> : null}
-        //             {text && text === "error" ? <Tag color="error">获取失败</Tag> : null}
-        //         </Space>
-        //     )
-        // },
         {
             title: t('operation'),
             key: "action",
@@ -674,7 +620,7 @@ function Zksync() {
             title: 'tx',
             dataIndex: 'interactions',
             key: 'interactions',
-            sorter: (a, b) => a.interactions - b.interactions,
+            // sorter: (a, b) => a.interactions - b.interactions,
             align: 'center',
         },
         {
@@ -689,7 +635,7 @@ function Zksync() {
             dataIndex: 'volume',
             key: 'volume',
             align: 'center',
-            sorter: (a, b) => a.volume - b.volume,
+            // sorter: (a, b) => a.volume - b.volume,
             defaultSortOrder: 'descend',
             render: (text) => (Number(text).toFixed(2)),
         }
@@ -879,16 +825,6 @@ function Zksync() {
                             justifyContent: 'space-between',
                             gap: '20px',
                         }}>
-                            {/* <Button type="primary"
-                                    onClick={() => {
-                                        setEcosystemModalVisible(true)
-                                    }}
-                                    size="large"
-                                    style={{flex: 1}}
-                                    icon={<AppstoreAddOutlined/>}
-                            >
-                                <span style={{color: 'white'}}>{t('ecosystem')}</span>
-                            </Button> */}
                             <Button type="primary" onClick={showBatchModal} size={"large"}
                                     style={{flex: 1}}
                                     icon={<UploadOutlined/>}

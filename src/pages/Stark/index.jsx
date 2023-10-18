@@ -1,79 +1,848 @@
 import {useEffect, useState} from "react";
+import {Button, Input, Space, Table, Modal, Form, notification, Spin, Tag, Popconfirm} from 'antd';
+import {Layout, Card, Typography} from 'antd';
+import { EyeOutlined, EyeInvisibleOutlined } from "@ant-design/icons"
 import {
-    Button,
-    Input,
-    Space,
-    Table,
-    Modal,
-    Form,
-    notification,
-    Spin,
-    Tag,
-    Popconfirm,
-    message,
-    Tooltip,
-    Typography
-} from 'antd';
-import {Layout, Card} from 'antd';
-import {exportToExcel,} from "@utils"
+    getStarkTx,
+    getStarkBridge,
+    getStarkInfo,
+    exportToExcel,
+    getStarkBalances,
+    getStarkActivity,
+    getStarkAmount,
+    getStarkERC20
+} from "@utils"
 import {
-    CheckCircleOutlined,
-    CloseCircleOutlined,
-    CopyOutlined,
     DeleteOutlined,
     DownloadOutlined,
-    EditOutlined, ReloadOutlined,
+    EditOutlined,
+    PlusOutlined,
     SyncOutlined,
-    UploadOutlined
+    UploadOutlined,
+    ReloadOutlined
 } from "@ant-design/icons";
-import {getStark} from "@utils/stark/main.js";
-import './index.css'
-import copy from "copy-to-clipboard";
-import deleteData from "@utils/indexedDB/deleteData.js";
 import { convertTimeToHumanReadable } from "@utils/time"
-
-const {Text, Paragraph} = Typography;
+import './index.css'
+const {Paragraph} = Typography;
 const {TextArea} = Input;
+
 const {Content} = Layout;
 const Stark = () => {
+    const [isModalVisible, setIsModalVisible] = useState(false);
     const [isBatchModalVisible, setIsBatchModalVisible] = useState(false);
-    const [batchLoading, setBatchLoading] = useState(false);
     const [data, setData] = useState([]);
     const [batchForm] = Form.useForm();
     const [isLoading, setIsLoading] = useState(false);
     const [selectedKeys, setSelectedKeys] = useState([]);
     const [tableLoading, setTableLoading] = useState(false);
-    let idCounter = data.length + 1;
-    const [initialized, setInitialized] = useState(false);
+    const [form] = Form.useForm();
+    const [tableHeight, setTableHeight] = useState(0);
+    const [hideColumn, setHideColumn] = useState(false);
+
+    const toggleHideColumn = () => {
+        setHideColumn(!hideColumn);
+      };
+
+    const getEyeIcon = () => {
+    if (hideColumn) {
+        return <EyeInvisibleOutlined />;
+    }
+    return <EyeOutlined />;
+    };
 
     useEffect(() => {
-        setTableLoading(true);
+        const handleResize = () => {
+            setTableHeight(window.innerHeight - 260); // 减去其他组件的高度，如页眉、页脚等
+        };
+    window.addEventListener('resize', handleResize);
+    handleResize();
 
+    return () => {
+        window.removeEventListener('resize', handleResize);
+    };
+    }, []);
+
+    useEffect(() => {
+        setTableLoading(true)
         const storedAddresses = localStorage.getItem('stark_addresses');
         setTimeout(() => {
             setTableLoading(false);
         }, 500);
-
         if (storedAddresses) {
             setData(JSON.parse(storedAddresses));
         }
-
-        setInitialized(true);
     }, []);
+    const handleDelete = (key) => {
+        setData(data.filter(item => item.key !== key));
+        localStorage.setItem('stark_addresses', JSON.stringify(data.filter(item => item.key !== key)));
+    }
+    const handleOk = async () => {
+        try {
+            const values = await form.validateFields();
+            if (values.address.length !== 66 && values.address.length !== 64) {
+                notification.error({
+                    message: "错误",
+                    description: "请输入正确的stark地址(64位)",
+                }, 2);
+                return;
+            }
+            if (!values.address.startsWith('0x')) {
+                values.address = '0x' + values.address;
+            }
+            setIsModalVisible(false);
+            const index = data.findIndex(item => item.address === values.address);
+            if (index !== -1) {
+                setData(data.map((item, i) => {
+                    if (i === index) {
+                        return {
+                            ...item,
+                            name: values.name,
+                        }
+                    }
+                    return item;
+                }));
+                const updatedData = [...data];
+                getStarkInfo(values.address).then(({wallet_type, deployed_at_timestamp, stark_id}) => {
+                    updatedData[index] = {
+                        ...updatedData[index],
+                        wallet_type: wallet_type,
+                        create_time: deployed_at_timestamp,
+                        stark_id: stark_id,
+                    };
+                    setData(updatedData);
+                    localStorage.setItem('stark_addresses', JSON.stringify(data));
+                })
+                getStarkBalances(values.address).then(({eth_balance, usdc_balance, usdt_balance, dai_balance}) => {
+                    updatedData[index] = {
+                        ...updatedData[index],
+                        stark_eth_balance: eth_balance,
+                        stark_usdc_balance: usdc_balance,
+                        stark_usdt_balance: usdt_balance,
+                        stark_dai_balance: dai_balance,
+                    };
+                    setData(updatedData);
+                    localStorage.setItem('stark_addresses', JSON.stringify(data));
+                })
+                getStarkActivity(values.address).then(({dayActivity, weekActivity, monthActivity}) => {
+                    updatedData[index] = {
+                        ...updatedData[index],
+                        dayActivity: dayActivity,
+                        weekActivity: weekActivity,
+                        monthActivity: monthActivity
+                    };
+                    setData(updatedData);
+                    localStorage.setItem('stark_addresses', JSON.stringify(data));
+                })
+                getStarkAmount(values.address).then(({stark_exchange_amount}) => {
+                    updatedData[index] = {
+                        ...updatedData[index],
+                        stark_exchange_amount: stark_exchange_amount,
+                    };
+                    setData(updatedData);
+                    localStorage.setItem('stark_addresses', JSON.stringify(data));
+                })
+                getStarkBridge(values.address).then(({
+                                                         d_eth_amount, d_eth_count,
+                                                         d_usdc_amount, d_usdc_count,
+                                                         d_usdt_amount, d_usdt_count,
+                                                         d_dai_amount, d_dai_count,
+                                                         d_wbtc_amount,
+                                                         d_wbtc_count,
+                                                         w_eth_amount, w_eth_count,
+                                                         w_usdc_amount, w_usdc_count,
+                                                         w_usdt_amount, w_usdt_count,
+                                                         w_dai_amount, w_dai_count,
+                                                         w_wbtc_amount, w_wbtc_count,
+                                                         total_deposit_count, total_widthdraw_count
 
-    useEffect(() => {
-        if (!initialized) return;
+                                                     }) => {
+                    updatedData[index] = {
+                        ...updatedData[index],
+                        d_eth_amount, d_eth_count,
+                        d_usdc_amount, d_usdc_count,
+                        d_usdt_amount, d_usdt_count,
+                        d_dai_amount, d_dai_count,
+                        d_wbtc_amount,
+                        d_wbtc_count,
+                        w_eth_amount, w_eth_count,
+                        w_usdc_amount, w_usdc_count,
+                        w_usdt_amount, w_usdt_count,
+                        w_dai_amount, w_dai_count,
+                        w_wbtc_amount, w_wbtc_count,
+                        total_deposit_count, total_widthdraw_count
+                    };
+                    setData(updatedData);
+                    localStorage.setItem('stark_addresses', JSON.stringify(data));
+                })
+                getStarkTx(values.address).then(({tx, stark_latest_tx_time}) => {
+                    updatedData[index] = {
+                        ...updatedData[index],
+                        stark_tx_amount: tx,
+                        stark_latest_tx_time: stark_latest_tx_time
+                    };
+                    setData(updatedData);
+                    localStorage.setItem('stark_addresses', JSON.stringify(data));
+                })
+            } else {
+                const newEntry = {
+                    key: data.length.toString(),
+                    name: values.name,
+                    address: values.address,
+                    stark_eth_balance: null,
+                    stark_usdc_balance: null,
+                    stark_usdt_balance: null,
+                    stark_dai_balance: null,
+                    dayActivity: null,
+                    weekActivity: null,
+                    monthActivity: null,
+                    stark_exchange_amount: null,
+                    stark_id: null,
+                    create_time: null,
+                    d_eth_amount: null,
+                    d_eth_count: null,
+                    d_usdc_amount: null,
+                    d_usdc_count: null,
+                    d_usdt_amount: null,
+                    d_usdt_count: null,
+                    d_dai_amount: null,
+                    d_dai_count: null,
+                    d_wbtc_amount: null,
+                    d_wbtc_count: null,
+                    w_eth_amount: null,
+                    w_eth_count: null,
+                    w_usdc_amount: null,
+                    w_usdc_count: null,
+                    w_usdt_amount: null,
+                    w_usdt_count: null,
+                    w_dai_amount: null,
+                    w_dai_count: null,
+                    w_wbtc_amount: null,
+                    w_wbtc_count: null,
+                    stark_tx_amount: null,
+                    stark_latest_tx: null,
+                    stark_latest_tx_time: null,
+                    total_deposit_count: null,
+                    total_widthdraw_count: null
+                };
+                const newData = [...data, newEntry];
+                setData(newData);
+                getStarkTx(values.address).then(({tx, stark_latest_tx_time}) => {
+                    newEntry.stark_tx_amount = tx;
+                    newEntry.stark_latest_tx_time = stark_latest_tx_time;
+                    setData([...newData]);
+                    localStorage.setItem('stark_addresses', JSON.stringify(newData));
+                })
+                getStarkInfo(values.address).then(({wallet_type, deployed_at_timestamp, stark_id}) => {
+                    newEntry.wallet_type = wallet_type;
+                    newEntry.create_time = deployed_at_timestamp;
+                    newEntry.stark_id = stark_id;
+                    setData([...newData]);
+                    localStorage.setItem('stark_addresses', JSON.stringify(newData));
+                })
+                getStarkBalances(values.address).then(({eth_balance, usdc_balance, usdt_balance, dai_balance}) => {
+                    newEntry.stark_eth_balance = eth_balance;
+                    newEntry.stark_usdc_balance = usdc_balance;
+                    newEntry.stark_usdt_balance = usdt_balance;
+                    newEntry.stark_dai_balance = dai_balance;
+                    setData([...newData]);
+                    localStorage.setItem('stark_addresses', JSON.stringify(newData));
+                })
+                getStarkActivity(values.address).then(({dayActivity, weekActivity, monthActivity}) => {
+                    newEntry.dayActivity = dayActivity;
+                    newEntry.weekActivity = weekActivity;
+                    newEntry.monthActivity = monthActivity;
+                    setData([...newData]);
+                    localStorage.setItem('stark_addresses', JSON.stringify(newData));
+                })
+                getStarkAmount(values.address).then(({stark_exchange_amount}) => {
+                    newEntry.stark_exchange_amount = stark_exchange_amount;
+                    setData([...newData]);
+                    localStorage.setItem('stark_addresses', JSON.stringify(newData));
+                })
+                getStarkBridge(values.address).then(({
+                                                         d_eth_amount, d_eth_count,
+                                                         d_usdc_amount, d_usdc_count,
+                                                         d_usdt_amount, d_usdt_count,
+                                                         d_dai_amount, d_dai_count,
+                                                         d_wbtc_amount,
+                                                         d_wbtc_count,
+                                                         w_eth_amount, w_eth_count,
+                                                         w_usdc_amount, w_usdc_count,
+                                                         w_usdt_amount, w_usdt_count,
+                                                         w_dai_amount, w_dai_count,
+                                                         w_wbtc_amount, w_wbtc_count,
+                                                         total_widthdraw_count, total_deposit_count
+                                                     }) => {
+                    newEntry.d_eth_amount = d_eth_amount;
+                    newEntry.d_eth_count = d_eth_count;
+                    newEntry.d_usdc_amount = d_usdc_amount;
+                    newEntry.d_usdc_count = d_usdc_count;
+                    newEntry.d_usdt_amount = d_usdt_amount;
+                    newEntry.d_usdt_count = d_usdt_count;
+                    newEntry.d_dai_amount = d_dai_amount;
+                    newEntry.d_dai_count = d_dai_count;
+                    newEntry.d_wbtc_amount = d_wbtc_amount;
+                    newEntry.d_wbtc_count = d_wbtc_count;
+                    newEntry.w_eth_amount = w_eth_amount;
+                    newEntry.w_eth_count = w_eth_count;
+                    newEntry.w_usdc_amount = w_usdc_amount;
+                    newEntry.w_usdc_count = w_usdc_count;
+                    newEntry.w_usdt_amount = w_usdt_amount;
+                    newEntry.w_usdt_count = w_usdt_count;
+                    newEntry.w_dai_amount = w_dai_amount;
+                    newEntry.w_dai_count = w_dai_count;
+                    newEntry.w_wbtc_amount = w_wbtc_amount;
+                    newEntry.w_wbtc_count = w_wbtc_count;
+                    newEntry.total_deposit_count = total_deposit_count;
+                    newEntry.total_widthdraw_count = total_widthdraw_count;
+                    setData([...newData]);
+                    localStorage.setItem('stark_addresses', JSON.stringify(newData));
+                })
+            }
+        } catch (error) {
+            notification.error({
+                message: "错误",
+                description: error.message,
+            }, 2);
+        } finally {
+            form.resetFields();
+        }
+    }
+    const handleBatchOk = async () => {
+        try {
+            const values = await batchForm.validateFields();
+            const addresses = values.addresses.split("\n");
+            const newData = [...data];
+            for (let address of addresses) {
+                address = address.trim();
+                if (address.length !== 66 && address.length !== 64) {
+                    notification.error({
+                        message: "错误",
+                        description: "请输入正确的stark地址(64位)",
+                    });
+                    continue;
+                }
+                if (!address.startsWith("0x")) {
+                    address = "0x" + address;
+                }
+                const index = newData.findIndex(item => item.address === address);
+                if (index !== -1) {
+                    const updatedData = [...newData];
+                    getStarkTx(address).then(({tx, stark_latest_tx_time}) => {
+                        updatedData[index] = {
+                            ...updatedData[index],
+                            stark_tx_amount: tx,
+                            stark_latest_tx_time: stark_latest_tx_time,
+                        };
+                        setData(updatedData);
+                        localStorage.setItem('stark_addresses', JSON.stringify(updatedData));
+                    })
+                    getStarkInfo(address).then(({wallet_type, deployed_at_timestamp, stark_id}) => {
+                        updatedData[index] = {
+                            ...updatedData[index],
+                            wallet_type: wallet_type,
+                            create_time: deployed_at_timestamp,
+                            stark_id: stark_id,
+                        };
+                        setData(updatedData);
+                        localStorage.setItem('stark_addresses', JSON.stringify(updatedData));
+                    })
+                    getStarkBalances(address).then(({eth_balance, usdc_balance, usdt_balance, dai_balance}) => {
+                        updatedData[index] = {
+                            ...updatedData[index],
+                            stark_eth_balance: eth_balance,
+                            stark_usdc_balance: usdc_balance,
+                            stark_usdt_balance: usdt_balance,
+                            stark_dai_balance: dai_balance,
+                        };
+                        setData(updatedData);
+                        localStorage.setItem('stark_addresses', JSON.stringify(updatedData));
+                    })
+                    getStarkActivity(address).then(({dayActivity, weekActivity, monthActivity}) => {
+                        updatedData[index] = {
+                            ...updatedData[index],
+                            dayActivity: dayActivity,
+                            weekActivity: weekActivity,
+                            monthActivity: monthActivity,
+                        };
+                        setData(updatedData);
+                        localStorage.setItem('stark_addresses', JSON.stringify(updatedData));
+                    })
+                    getStarkAmount(address).then(({stark_exchange_amount}) => {
+                        updatedData[index] = {
+                            ...updatedData[index],
+                            stark_exchange_amount: stark_exchange_amount,
+                        };
+                        setData(updatedData);
+                        localStorage.setItem('stark_addresses', JSON.stringify(updatedData));
+                    })
+                    getStarkBridge(address).then(({
+                                                      d_eth_amount, d_eth_count,
+                                                      d_usdc_amount, d_usdc_count,
+                                                      d_usdt_amount, d_usdt_count,
+                                                      d_dai_amount, d_dai_count,
+                                                      d_wbtc_amount,
+                                                      d_wbtc_count,
+                                                      w_eth_amount, w_eth_count,
+                                                      w_usdc_amount, w_usdc_count,
+                                                      w_usdt_amount, w_usdt_count,
+                                                      w_dai_amount, w_dai_count,
+                                                      w_wbtc_amount, w_wbtc_count,
+                                                      total_widthdraw_count, total_deposit_count
+                                                  }) => {
+                        updatedData[index] = {
+                            ...updatedData[index],
+                            d_eth_amount: d_eth_amount,
+                            d_eth_count: d_eth_count,
+                            d_usdc_amount: d_usdc_amount,
+                            d_usdc_count: d_usdc_count,
+                            d_usdt_amount: d_usdt_amount,
+                            d_usdt_count: d_usdt_count,
+                            d_dai_amount: d_dai_amount,
+                            d_dai_count: d_dai_count,
+                            d_wbtc_amount: d_wbtc_amount,
+                            d_wbtc_count: d_wbtc_count,
+                            w_eth_amount: w_eth_amount,
+                            w_eth_count: w_eth_count,
+                            w_usdc_amount: w_usdc_amount,
+                            w_usdc_count: w_usdc_count,
+                            w_usdt_amount: w_usdt_amount,
+                            w_usdt_count: w_usdt_count,
+                            w_dai_amount: w_dai_amount,
+                            w_dai_count: w_dai_count,
+                            w_wbtc_amount: w_wbtc_amount,
+                            w_wbtc_count: w_wbtc_count,
+                            total_widthdraw_count: total_widthdraw_count,
+                            total_deposit_count: total_deposit_count,
+                        };
+                    })
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                } else {
+                    const newEntry = {
+                        key: newData.length.toString(),
+                        address: address,
+                        stark_eth_balance: null,
+                        stark_usdc_balance: null,
+                        stark_usdt_balance: null,
+                        stark_dai_balance: null,
+                        dayActivity: null,
+                        weekActivity: null,
+                        monthActivity: null,
+                        stark_exchange_amount: null,
+                        stark_id: null,
+                        create_time: null,
+                        d_eth_amount: null,
+                        d_eth_count: null,
+                        d_usdc_amount: null,
+                        d_usdc_count: null,
+                        d_usdt_amount: null,
+                        d_usdt_count: null,
+                        d_dai_amount: null,
+                        d_dai_count: null,
+                        d_wbtc_amount: null,
+                        d_wbtc_count: null,
+                        w_eth_amount: null,
+                        w_eth_count: null,
+                        w_usdc_amount: null,
+                        w_usdc_count: null,
+                        w_usdt_amount: null,
+                        w_usdt_count: null,
+                        w_dai_amount: null,
+                        w_dai_count: null,
+                        w_wbtc_amount: null,
+                        w_wbtc_count: null,
+                        stark_tx_amount: null,
+                        stark_latest_tx: null,
+                        stark_latest_tx_time: null,
+                        total_deposit_count: null,
+                        total_widthdraw_count: null
 
-        localStorage.setItem('stark_addresses', JSON.stringify(data));
-    }, [data, initialized]);
+                    };
+                    newData.push(newEntry);
+                    setData(newData);
+                    getStarkTx(address).then(({tx, stark_latest_tx_time}) => {
+                        newEntry.stark_tx_amount = tx;
+                        newEntry.stark_latest_tx_time = stark_latest_tx_time;
+                        setData([...newData]);
+                        localStorage.setItem('stark_addresses', JSON.stringify(newData));
+                    })
+                    getStarkInfo(address).then(({wallet_type, deployed_at_timestamp, stark_id}) => {
+                        newEntry.wallet_type = wallet_type;
+                        newEntry.create_time = deployed_at_timestamp;
+                        newEntry.stark_id = stark_id;
+                        setData([...newData]);
+                        localStorage.setItem('stark_addresses', JSON.stringify(newData));
+                    })
+                    getStarkBalances(address).then(({eth_balance, usdc_balance, usdt_balance, dai_balance}) => {
+                        newEntry.stark_eth_balance = eth_balance;
+                        newEntry.stark_usdc_balance = usdc_balance;
+                        newEntry.stark_usdt_balance = usdt_balance;
+                        newEntry.stark_dai_balance = dai_balance;
+                        setData([...newData]);
+                        localStorage.setItem('stark_addresses', JSON.stringify(newData));
+                    })
+                    getStarkActivity(address).then(({dayActivity, weekActivity, monthActivity}) => {
+                        newEntry.dayActivity = dayActivity;
+                        newEntry.weekActivity = weekActivity;
+                        newEntry.monthActivity = monthActivity;
+                        setData([...newData]);
+                        localStorage.setItem('stark_addresses', JSON.stringify(newData));
+                    })
+                    getStarkAmount(address).then(({stark_exchange_amount}) => {
+                        newEntry.stark_exchange_amount = stark_exchange_amount;
+                        setData([...newData]);
+                        localStorage.setItem('stark_addresses', JSON.stringify(newData));
+                    })
+                    getStarkBridge(address).then(({
+                                                      d_eth_amount, d_eth_count,
+                                                      d_usdc_amount, d_usdc_count,
+                                                      d_usdt_amount, d_usdt_count,
+                                                      d_dai_amount, d_dai_count,
+                                                      d_wbtc_amount,
+                                                      d_wbtc_count,
+                                                      w_eth_amount, w_eth_count,
+                                                      w_usdc_amount, w_usdc_count,
+                                                      w_usdt_amount, w_usdt_count,
+                                                      w_dai_amount, w_dai_count,
+                                                      w_wbtc_amount, w_wbtc_count,
+                                                      total_widthdraw_count, total_deposit_count
+                                                  }) => {
+                        newEntry.d_eth_amount = d_eth_amount;
+                        newEntry.d_eth_count = d_eth_count;
+                        newEntry.d_usdc_amount = d_usdc_amount;
+                        newEntry.d_usdc_count = d_usdc_count;
+                        newEntry.d_usdt_amount = d_usdt_amount;
+                        newEntry.d_usdt_count = d_usdt_count;
+                        newEntry.d_dai_amount = d_dai_amount;
+                        newEntry.d_dai_count = d_dai_count;
+                        newEntry.d_wbtc_amount = d_wbtc_amount;
+                        newEntry.d_wbtc_count = d_wbtc_count;
+                        newEntry.w_eth_amount = w_eth_amount;
+                        newEntry.w_eth_count = w_eth_count;
+                        newEntry.w_usdc_amount = w_usdc_amount;
+                        newEntry.w_usdc_count = w_usdc_count;
+                        newEntry.w_usdt_amount = w_usdt_amount;
+                        newEntry.w_usdt_count = w_usdt_count;
+                        newEntry.w_dai_amount = w_dai_amount;
+                        newEntry.w_dai_count = w_dai_count;
+                        newEntry.w_wbtc_amount = w_wbtc_amount;
+                        newEntry.w_wbtc_count = w_wbtc_count;
+                        newEntry.total_widthdraw_count = total_widthdraw_count;
+                        newEntry.total_deposit_count = total_deposit_count;
+                        setData([...newData]);
+                        localStorage.setItem('stark_addresses', JSON.stringify(newData));
+                    })
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                }
+            }
+            setIsBatchModalVisible(false);
+        } catch (error) {
+            notification.error({
+                message: "错误",
+                description: error.message,
+            });
+        } finally {
+            batchForm.resetFields();
+            setSelectedKeys([]);
+        }
+    }
+    const handleRefresh = async (singleKey) => {
+        const keys = singleKey ? [singleKey] : selectedKeys;
+        if (!keys.length) {
+            notification.error({
+                message: "错误",
+                description: "请先选择要刷新的地址",
+            }, 2);
+            return;
+        }
+        setIsLoading(true);
+        try {
+            const limit = 20;
+            let activePromises = 0;
+            let promisesQueue = [];
+            const newData = [...data];
+            let timestampsArray = [];
+            const processQueue = () => {
+                while (activePromises < limit && promisesQueue.length > 0) {
+                    const promise = promisesQueue.shift();
+                    activePromises += 1;
 
+                    promise().finally(() => {
+                        activePromises -= 1;
+                        processQueue();
+                    });
+                }
+            };
+            for (let key of keys) {
+                const index = newData.findIndex(item => item.key === key);
+                if (index !== -1) {
+                    const item = newData[index];
+                    item.stark_tx_amount = null;
+                    item.stark_latest_tx = null;
+                    item.stark_latest_tx_time = null;
+                    item.stark_eth_balance = null;
+                    item.stark_usdc_balance = null;
+                    item.stark_usdt_balance = null;
+                    item.stark_dai_balance = null;
+                    item.d_eth_amount = null;
+                    item.d_eth_count = null;
+                    item.d_usdc_amount = null;
+                    item.d_usdc_count = null;
+                    item.d_usdt_amount = null;
+                    item.d_usdt_count = null;
+                    item.d_dai_amount = null;
+                    item.d_dai_count = null;
+                    item.d_wbtc_amount = null;
+                    item.d_wbtc_count = null;
+                    item.w_eth_amount = null;
+                    item.w_eth_count = null;
+                    item.w_usdc_amount = null;
+                    item.w_usdc_count = null;
+                    item.w_usdt_amount = null;
+                    item.w_usdt_count = null;
+                    item.w_dai_amount = null;
+                    item.w_dai_count = null;
+                    item.w_wbtc_amount = null;
+                    item.w_wbtc_count = null;
+                    item.total_widthdraw_count = null;
+                    item.total_deposit_count = null;
+                    setData([...newData]);
+                    promisesQueue.push(() => {
+                        return getStarkTx(item.address).then(({tx, stark_latest_tx_time, stark_timestamps}) => {
+                        item.stark_tx_amount = tx;
+                        item.stark_latest_tx_time = stark_latest_tx_time;
+                        timestampsArray.push(stark_timestamps);
+                        setData([...newData]);
+                        localStorage.setItem('stark_addresses', JSON.stringify(data));
+                    })})
+                    // promisesQueue.push(() => {
+                    //     return getStarkInfo(item.address).then(({wallet_type, deployed_at_timestamp, stark_id}) => {
+                    //         item.wallet_type = wallet_type;
+                    //         item.create_time = deployed_at_timestamp;
+                    //         item.stark_id = stark_id;
+                    //         setData([...newData]);
+                    //         localStorage.setItem('stark_addresses', JSON.stringify(data));
+                    //     })
+                    // })
+                    // promisesQueue.push(() => {
+                    //     return getStarkBalances(item.address).then(({eth_balance, usdc_balance, usdt_balance, dai_balance}) => {
+                    //     item.stark_eth_balance = eth_balance;
+                    //     item.stark_usdc_balance = usdc_balance;
+                    //     item.stark_usdt_balance = usdt_balance;
+                    //     item.stark_dai_balance = dai_balance;
+                    //     setData([...newData]);
+                    //     localStorage.setItem('stark_addresses', JSON.stringify(data));
+                    // })})
+                    promisesQueue.push(() => {
+                        return getStarkBalances(item.address).then(({eth_balance, usdc_balance, usdt_balance, dai_balance}) => {
+                        item.stark_eth_balance = eth_balance;
+                        item.stark_usdc_balance = usdc_balance;
+                        item.stark_usdt_balance = usdt_balance;
+                        item.stark_dai_balance = dai_balance;
+                        setData([...newData]);
+                        localStorage.setItem('stark_addresses', JSON.stringify(data));
+                    })})
+                    // promisesQueue.push(() => {
+                    //     return getStarkActivity(item.address).then(({dayActivity, weekActivity, monthActivity}) => {
+                    //     item.dayActivity = dayActivity;
+                    //     item.weekActivity = weekActivity;
+                    //     item.monthActivity = monthActivity;
+                    //     setData([...newData]);
+                    //     localStorage.setItem('stark_addresses', JSON.stringify(data));
+                    // })})
+                    // promisesQueue.push(() => {
+                    //     return getStarkAmount(item.address).then(({stark_exchange_amount}) => {
+                    //     item.stark_exchange_amount = stark_exchange_amount;
+                    //     setData([...newData]);
+                    //     localStorage.setItem('stark_addresses', JSON.stringify(data));
+                    // })})
+                    promisesQueue.push(() => {
+                        return getStarkBridge(item.address).then(({
+                            d_eth_amount, d_eth_count,
+                            d_usdc_amount, d_usdc_count,
+                            d_usdt_amount, d_usdt_count,
+                            d_dai_amount, d_dai_count,
+                            d_wbtc_amount,
+                            d_wbtc_count,
+                            w_eth_amount, w_eth_count,
+                            w_usdc_amount, w_usdc_count,
+                            w_usdt_amount, w_usdt_count,
+                            w_dai_amount, w_dai_count,
+                            w_wbtc_amount, w_wbtc_count,
+                            total_widthdraw_count, total_deposit_count
+                        }) => {
+                            item.d_eth_amount = d_eth_amount;
+                            item.d_eth_count = d_eth_count;
+                            item.d_usdc_amount = d_usdc_amount;
+                            item.d_usdc_count = d_usdc_count;
+                            item.d_usdt_amount = d_usdt_amount;
+                            item.d_usdt_count = d_usdt_count;
+                            item.d_dai_amount = d_dai_amount;
+                            item.d_dai_count = d_dai_count;
+                            item.d_wbtc_amount = d_wbtc_amount;
+                            item.d_wbtc_count = d_wbtc_count;
+                            item.w_eth_amount = w_eth_amount;
+                            item.w_eth_count = w_eth_count;
+                            item.w_usdc_amount = w_usdc_amount;
+                            item.w_usdc_count = w_usdc_count;
+                            item.w_usdt_amount = w_usdt_amount;
+                            item.w_usdt_count = w_usdt_count;
+                            item.w_dai_amount = w_dai_amount;
+                            item.w_dai_count = w_dai_count;
+                            item.w_wbtc_amount = w_wbtc_amount;
+                            item.w_wbtc_count = w_wbtc_count;
+                            item.total_widthdraw_count = total_widthdraw_count;
+                            item.total_deposit_count = total_deposit_count;
+                            setData([...newData]);
+                            localStorage.setItem('stark_addresses', JSON.stringify(data));
+                        })
+                    })
+                }
+            processQueue();
+            }
+            while (activePromises > 0 || promisesQueue.length > 0) {
+                await new Promise(resolve => setTimeout(resolve, 2000));
+            }
+            const stark_timestamps = timestampsArray.flat()
+            localStorage.setItem('stark_timestamps', JSON.stringify(stark_timestamps));
+            for (let key of keys) {
+                const index = newData.findIndex(item => item.key === key);
+                if (index !== -1) {
+                    const item = newData[index];
+                    item.dayActivity = null;
+                    item.weekActivity = null;
+                    item.monthActivity = null;
+                    item.stark_exchange_amount = null;
+                    item.refresh = +new Date();
+                    if (item.wallet_type === "Error" || item.wallet_type === undefined) {
+                        getStarkInfo(item.address).then(({wallet_type, deployed_at_timestamp, stark_id}) => {
+                            item.wallet_type = wallet_type;
+                            item.create_time = deployed_at_timestamp;
+                            item.stark_id = stark_id;
+                            setData([...newData]);
+                            localStorage.setItem('stark_addresses', JSON.stringify(newData));
+                        })
+                    }
+                    getStarkActivity(item.address).then(({dayActivity, weekActivity, monthActivity}) => {
+                        item.dayActivity = dayActivity;
+                        item.weekActivity = weekActivity;
+                        item.monthActivity = monthActivity;
+                        setData([...newData]);
+                        localStorage.setItem('stark_addresses', JSON.stringify(newData));
+                    })
+                    getStarkAmount(item.address).then(({stark_exchange_amount}) => {
+                        item.stark_exchange_amount = stark_exchange_amount;
+                        setData([...newData]);
+                        localStorage.setItem('stark_addresses', JSON.stringify(newData));
+                    })
+                    await new Promise(resolve => setTimeout(resolve, 5000));
+                }
+        }
+        } catch (error) {
+            notification.error({
+                message: "错误",
+                description: error.message,
+            }, 2);
+        } finally {
+            setIsLoading(false);
+            setSelectedKeys([]);
+        }
+    };
+    const handleQuickRefresh = async () => {
+        if (!selectedKeys.length) {
+            notification.error({
+                message: "错误",
+                description: "请先选择要刷新的地址",
+            }, 2);
+            return;
+        }
+        setIsLoading(true);
+        try {
+            const limit = 20;
+            let activePromises = 0;
+            let promisesQueue = [];
+            const newData = [...data];
+            let timestampsArray = [];
+            const processQueue = () => {
+                while (activePromises < limit && promisesQueue.length > 0) {
+                    const promise = promisesQueue.shift();
+                    activePromises += 1;
+
+                    promise().finally(() => {
+                        activePromises -= 1;
+                        processQueue();
+                    });
+                }
+            };
+            for (let key of selectedKeys) {
+                const index = newData.findIndex(item => item.key === key);
+                if (index !== -1) {
+                    const item = newData[index];
+                    item.stark_tx_amount = null;
+                    item.stark_latest_tx_time = null;
+                    item.stark_eth_balance = null;
+                    item.stark_usdc_balance = null;
+                    item.stark_usdt_balance = null;
+                    item.stark_dai_balance = null;
+                    setData([...newData]);
+                    promisesQueue.push(() => {
+                        return getStarkTx(item.address).then(({tx, stark_latest_tx_time, stark_timestamps}) => {
+                        item.stark_tx_amount = tx;
+                        item.stark_latest_tx_time = stark_latest_tx_time;
+                        timestampsArray.push(stark_timestamps);
+                        setData([...newData]);
+                        localStorage.setItem('stark_addresses', JSON.stringify(data));
+                    })})
+                    promisesQueue.push(() => {
+                        return getStarkBalances(item.address).then(({eth_balance, usdc_balance, usdt_balance, dai_balance}) => {
+                        item.stark_eth_balance = eth_balance;
+                        item.stark_usdc_balance = usdc_balance;
+                        item.stark_usdt_balance = usdt_balance;
+                        item.stark_dai_balance = dai_balance;
+                        setData([...newData]);
+                        localStorage.setItem('stark_addresses', JSON.stringify(data));
+                    })})
+                }
+            processQueue();
+            }
+            while (activePromises > 0 || promisesQueue.length > 0) {
+                await new Promise(resolve => setTimeout(resolve, 2000));
+            }
+            const stark_timestamps = timestampsArray.flat()
+            localStorage.setItem('stark_timestamps', JSON.stringify(stark_timestamps));
+        } catch (error) {
+            notification.error({
+                message: "错误",
+                description: error.message,
+            }, 2);
+        } finally {
+            setIsLoading(false);
+            setSelectedKeys([]);
+        }
+    };
+    const handleDeleteSelected = () => {
+        if (!selectedKeys.length) {
+            notification.error({
+                message: "错误",
+                description: "请先选择要删除的地址",
+            }, 2);
+            return;
+        }
+        setData(data.filter(item => !selectedKeys.includes(item.key)));
+        localStorage.setItem('stark_addresses', JSON.stringify(data.filter(item => !selectedKeys.includes(item.key))));
+        setSelectedKeys([]);
+    }
+    const exportToExcelFile = () => {
+        exportToExcel(data, 'starkInfo');
+    }
+    const [editingKey, setEditingKey] = useState(null);
     const columns = [
         {
             title: "#",
             key: "index",
             align: "center",
-            width: 50,
             render: (text, record, index) => index + 1,
+            width: 60,
         },
         {
             title: "最后刷新",
@@ -92,63 +861,6 @@ const Stark = () => {
             ),
         },
         {
-            title: "状态",
-            key: "result",
-            align: "center",
-            render: (text, record) => (
-                <Space>
-                    {record['result'] === "success" ?
-                        <Tag icon={<CheckCircleOutlined/>} color="success">成功</Tag> : null}
-                    {record['result'] === "error" ?
-                        <Tooltip title={record['reason']}>
-                            <Tag icon={<CloseCircleOutlined/>} color="error">失败 </Tag>
-                        </Tooltip> : null}
-                    {record['result'] === "pending" ?
-                        <Tag icon={<SyncOutlined spin/>} color="processing">获取中 </Tag> : null}
-                </Space>
-            )
-        },
-        // {
-        //     title: "备注",
-        //     dataIndex: "name",
-        //     key: "name",
-        //     align: "center",
-        //     className: "name",
-        //     render: (text, record) => {
-        //         const displayText = text || <EditOutlined/>;
-        //         return (
-        //             <Popconfirm
-        //                 title={
-        //                     <div>
-        //                         <Input
-        //                             placeholder={"请输入备注"}
-        //                             defaultValue={text}
-        //                             onChange={(e) => {
-        //                                 record.name = e.target.value
-        //                             }}
-        //                             allowClear
-        //                             bordered
-        //                         />
-        //                     </div>
-        //                 }
-        //                 icon={<EditOutlined/>}
-        //                 onConfirm={() => {
-        //                     setData([...data]);
-        //                     localStorage.setItem('stark_addresses', JSON.stringify(data));
-        //                 }}
-        //                 onCancel={() => {
-        //                 }}
-        //                 okText={"确定"}
-        //                 cancelText={"取消"}
-        //             >
-        //                 <Tag color="blue" style={{cursor: "pointer"}}>
-        //                     {displayText}
-        //                 </Tag>
-        //             </Popconfirm>
-        //         );
-        //     }
-        // },
-        {
             title: '地址',
             dataIndex: "address",
             key: "address",
@@ -164,474 +876,227 @@ const Stark = () => {
             },
         },
         {
-            title: "StarkId",
-            dataIndex: ["accountInfo", "starkId"],
-            key: "starkId",
+            title: "创建时间",
+            dataIndex: "create_time",
+            key: "create_time",
             align: "center",
-            render: (text) => text,
+            className: "create_time",
+            render: (text, record) => {
+                if (text === null) {
+                    return <Spin/>;
+                } else {
+                    let date = new Date(text * 1000);
+                    let year = date.getFullYear();
+                    let month = (date.getMonth() + 1).toString().padStart(2, '0');
+                    let day = date.getDate().toString().padStart(2, '0');
+                    return `${year}/${month}/${day}`;
+                }
+            },
+            width: 100,
         },
         {
-            title: "StarkNet",
+            title: "ETH",
+            dataIndex: "stark_eth_balance",
+            key: "stark_eth_balance",
+            align: "center",
+            render: (text, record) => text === null ? <Spin/> : text,
+            width: 70,
+        },
+        {
+            title: "USDC",
+            dataIndex: "stark_usdc_balance",
+            key: "stark_usdc_balance",
+            align: "center",
+            render: (text, record) => text === null ? <Spin/> : text,
+            width: 70,
+        },
+        {
+            title: "USDT",
+            dataIndex: "stark_usdt_balance",
+            key: "stark_usdt_balance",
+            align: "center",
+            render: (text, record) => text === null ? <Spin/> : text,
+            width: 70,
+        },
+        {
+            title: "DAI",
+            dataIndex: "stark_dai_balance",
+            key: "stark_dai_balance",
+            align: "center",
+            render: (text, record) => text === null ? <Spin/> : text,
+            width: 70,
+        },
+        {
+            title: "Tx",
+            dataIndex: "stark_tx_amount",
+            key: "stark_tx_amount",
+            align: "center",
+            // sorter: (a, b) => a.stark_tx_amount - b.stark_tx_amount,
+            render: (text, record) => {
+                if (text === null) {
+                    return <Spin />;
+                }
+
+                // 计算对数值
+                const logarithmValue = Math.log(text); // 使用自然对数（以e为底）
+                // const logarithmValue = Math.log10(text); // 使用常用对数（以10为底）
+
+                // 归一化处理
+                const minValue = Math.log(1); // 最小值的对数
+                const maxValue = Math.log(100); // 最大值的对数
+                const normalizedValue = (logarithmValue - minValue) / (maxValue - minValue);
+
+                // 计算透明度
+                const minOpacity = 0.1; // 最小透明度
+                const maxOpacity = 1; // 最大透明度
+                const opacity = normalizedValue * (maxOpacity - minOpacity) + minOpacity;
+
+                const backgroundColor = `rgba(173, 216, 230, ${opacity})`;
+
+                return {
+                    children: text,
+                    props: {
+                    style: {
+                        background: backgroundColor,
+                    },
+                    },
+                };
+                },
+            width: 70,
+        },
+        // {
+        //     title: "最后交易时间",
+        //     dataIndex: "stark_latest_tx",
+        //     key: "stark_latest_tx",
+        //     align: "center",
+        //     render: (text, record) => text === null ? <Spin/> : text,
+        //     width: 100,
+        // },
+        {
+            title: "最后交易",
+            dataIndex: "stark_latest_tx_time",
+            key: "stark_latest_tx_time",
+            align: "center",
+            render: (text, record) => {
+                let textColor = "inherit";
+
+                if (text === null) {
+                    return <Spin />;
+                } else if (text?.includes("天") && parseInt(text) > 7) {
+                    textColor = "red";
+                } else {
+                    textColor = "#1677ff";
+                }
+
+                return (
+                    <a
+                    href={"https://starkscan.co/contract/" + record.address}
+                    target={"_blank"}
+                    style={{ color: textColor }}
+                    >
+                    {text}
+                    </a>
+                );
+                },
+            width: 70,
+        },
+        {
+            title: "活跃统计",
+            key: "activity_stats_group",
             children: [
                 {
-                    title: "ETH",
-                    dataIndex: ["balance", "ETH"],
-                    key: "stark_eth_balance",
+                    title: "日",
+                    dataIndex: "dayActivity",
+                    key: "dayActivity",
                     align: "center",
+                    // sorter: (a, b) => a.dayActivity - b.dayActivity,
+                    render: (text, record) => (text === null ? <Spin/> : text),
+                    width: 60
                 },
                 {
-                    title: "USDC",
-                    dataIndex: ["balance", "USDC"],
-                    key: "stark_usdc_balance",
+                    title: "周",
+                    dataIndex: "weekActivity",
+                    key: "weekActivity",
                     align: "center",
+                    // sorter: (a, b) => a.weekActivity - b.weekActivity,
+                    render: (text, record) => (text === null ? <Spin/> : text),
+                    width: 60
                 },
                 {
-                    title: "USDT",
-                    dataIndex: ["balance", "USDT"],
-                    key: "stark_usdt_balance",
+                    title: "月",
+                    dataIndex: "monthActivity",
+                    key: "monthActivity",
                     align: "center",
+                    render: (text, record) => (text === null ? <Spin/> : text),
+                    width: 60
                 },
                 {
-                    title: "DAI",
-                    dataIndex: ["balance", "DAI"],
-                    key: "stark_dai_balance",
+                    title: "交易金额",
+                    dataIndex: "stark_exchange_amount",
+                    key: "stark_exchange_amount",
                     align: "center",
-                },
-                {
-                    title: "WBTC",
-                    dataIndex: ["balance", "WBTC"],
-                    key: "stark_wbtc_balance",
-                    align: "center",
-                },
-                {
-                    title: "Tx",
-                    dataIndex: "tx",
-                    key: "stark_tx_amount",
-                    align: "center",
-                    sorter: (a, b) => a.tx - b.tx,
-                },
-                {
-                    title: "最后交易",
-                    dataIndex: "lastTime",
-                    key: "stark_latest_tx",
-                    align: "center",
-                    width: 90,
-                    render: (text, record) => <a href={`https://voyager.online/contract/${record.address}`}
-                                                 target="_blank">{text}</a>,
-                },
-                {
-                    title: "官方桥Tx",
-                    className: "stark_cross_tx",
-                    children: [
-                        {
-                            title: "L1->L2",
-                            dataIndex: ["bridge", "DepositTx"],
-                            align: "center",
-                            width: 60
-                        },
-                        {
-                            title: "L2->L1",
-                            dataIndex: ["bridge", "WithdrawTx"],
-                            align: "center",
-                            width: 60
-                        },
-                    ]
-                },
-                {
-                    title: "官方桥金额(U)",
-                    className: "stark_cross_amount",
-                    children: [
-                        {
-                            title: "L1->L2",
-                            dataIndex: ["bridge", "DepositVolume"],
-                            align: "center",
-                            width: 80
-
-                        },
-                        {
-                            title: "L2->L1",
-                            dataIndex: ["bridge", "WithdrawVolume"],
-                            align: "center",
-                            width: 80
+                    // sorter: (a, b) => a.stark_exchange_amount - b.stark_exchange_amount,
+                    render: (text, record) => {
+                        if (text === null) {
+                            return <Spin />;
                         }
-                    ]
 
-                },
-                {
-                    title: "活跃统计",
-                    className: "stark_activity",
-                    children: [
-                        {
-                            title: "天",
-                            dataIndex: ["activity", "dayActivity"],
-                            align: "center",
+                        // 计算对数值
+                        const logarithmValue = Math.log(text); // 使用自然对数（以e为底）
+                        // const logarithmValue = Math.log10(text); // 使用常用对数（以10为底）
+
+                        // 归一化处理
+                        const minValue = Math.log(1); // 最小值的对数
+                        const maxValue = Math.log(100); // 最大值的对数
+                        const normalizedValue = (logarithmValue - minValue) / (maxValue - minValue);
+
+                        // 计算透明度
+                        const minOpacity = 0.1; // 最小透明度
+                        const maxOpacity = 1; // 最大透明度
+                        const opacity = normalizedValue * (maxOpacity - minOpacity) + minOpacity;
+
+                        const backgroundColor = `rgba(211, 211, 211, ${opacity})`;
+
+                        return {
+                            children: text,
+                            props: {
+                            style: {
+                                background: backgroundColor,
+                            },
+                            },
+                        };
                         },
-                        {
-                            title: "周",
-                            dataIndex: ["activity", "weekActivity"],
-                            align: "center",
-                        },
-                        {
-                            title: "月",
-                            dataIndex: ["activity", "monthActivity"],
-                            align: "center",
-                        },
-                        {
-                            title: "合约",
-                            dataIndex: ["activity", "contractActivity"],
-                            align: "center",
-                        },
-                        {
-                            title: "Vol(U)",
-                            dataIndex: "Vol",
-                            align: "center",
-                            sorter: (a, b) => a.Vol - b.Vol,
-                        },
-                        {
-                            title: "fee(E)",
-                            dataIndex: "fee",
-                            align: "center",
-                            sorter: (a, b) => a.fee - b.fee,
-                        }
-                    ]
+                        width: 100
                 },
                 {
                     title: "操作",
                     key: "action",
                     align: "center",
                     render: (text, record) => (
-                        <Space>
-                            <Popconfirm title={"确认删除？"} onConfirm={async () => {
-                                await handleDelete(record.address)
-                            }}>
-                                <Button size='small' icon={<DeleteOutlined/>}/>
+                        <Space size="small">
+                            <Popconfirm title={"确认删除？"} onConfirm={() => handleDelete(record.key)}>
+                                <Button icon={<DeleteOutlined/>}/>
                             </Popconfirm>
-                            {/* <Button icon={<ReloadOutlined/>} onClick={() => {
-                                handleRefresh(record.key)
-                            }}/> */}
                         </Space>
-                    )
+                    ),
+                    width: 60,
                 }
             ]
         },
     ];
-    const handleDelete = async (address) => {
-        setData(data.filter(item => item.address !== address));
-        localStorage.setItem('stark_addresses', JSON.stringify(data.filter(item => item.address !== address)));
-        await deleteData("starkTransactions", [address]);
-    }
-    const handleBatchOk = async () => {
-        try {
-            setBatchLoading(true);
-            setIsBatchModalVisible(false);
-            const values = await batchForm.validateFields();
-            const addresses = values.addresses.split("\n");
-
-            const limit = 5;
-            let activePromises = 0;
-            let promisesQueue = [];
-
-            const processQueue = () => {
-                while (promisesQueue.length > 0 && activePromises < limit) {
-                    const promise = promisesQueue.shift();
-                    activePromises += 1;
-
-                    promise().finally(() => {
-                        activePromises -= 1;
-                        processQueue();
-                    });
-                }
-            };
-
-            for (let address of addresses) {
-                address = address.trim();
-                if (address.length === 0) {
-                    notification.error({
-                        message: "错误",
-                        description: "请输入正确的stark地址(64位)",
-                        duration: 1,
-                    });
-                    continue;
-                }
-                if (!address.startsWith("0x")) {
-                    address = "0x" + address;
-                }
-
-                const promiseFunction = () => new Promise(async (resolve, reject) => {
-                    try {
-                        setData(prevData => {
-                            const updatedData = [...prevData];
-                            const index = updatedData.findIndex(item => item.address === address);
-                            if (index === -1) {
-                                const newEntry = {
-                                    key: idCounter.toString(),
-                                    address: address,
-                                    result: "pending",
-                                };
-                                idCounter++;
-                                updatedData.push(newEntry);
-                            }
-                            return updatedData;
-                        });
-                        const response = await getStark(address);
-                        setData(prevData => {
-                            const updatedData = [...prevData];
-                            const index = updatedData.findIndex(item => item.address === address);
-                            if (index !== -1) {
-                                updatedData[index] = {
-                                    ...updatedData[index],
-                                    ...response,
-                                };
-                            }
-                            return updatedData;
-                        });
-                        resolve();
-                    } catch (error) {
-                        reject(error);
-                    }
-                });
-                promisesQueue.push(promiseFunction);
-            }
-            processQueue();
-            while (activePromises > 0 || promisesQueue.length > 0) {
-                await new Promise(resolve => setTimeout(resolve, 100));
-            }
-            notification.success({
-                message: "成功",
-                description: "批量添加完成",
-                duration: 1,
-            })
-        } catch (error) {
-            notification.error({
-                message: "错误",
-                description: error.message,
-                duration: 1,
-            });
-        } finally {
-            batchForm.resetFields();
-            setSelectedKeys([]);
-            setBatchLoading(false)
-        }
-    };
-    const handleRefresh = async (singleKey) => {
-        const keys = singleKey ? [singleKey] : selectedKeys;
-        if (!keys.length) {
-            notification.error({
-                message: "错误",
-                description: "请先选择要刷新的地址",
-                duration: 1,
-            });
-            return;
-        }
-        setIsLoading(true);
-        try {
-            const limit = 5;
-            let activePromises = 0;
-            let promisesQueue = [];
-            const processQueue = () => {
-                while (promisesQueue.length > 0 && activePromises < limit) {
-                    const promise = promisesQueue.shift();
-                    activePromises += 1;
-                    promise().finally(() => {
-                        activePromises -= 1;
-                        processQueue();
-                    });
-                }
-            };
-            for (let key of keys) {
-                const index = data.findIndex(item => item.key === key);
-                if (index !== -1) {
-                    const promiseFunction = () => new Promise(async (resolve, reject) => {
-                        try {
-                            setData(prevData => {
-                                const updatedData = [...prevData];
-                                for (let field in updatedData[index]) {
-                                    if (field !== 'address' && field !== 'name' && field !== 'key') {
-                                        if (field === "result") {
-                                            updatedData[index][field] = "pending";
-                                        } else {
-                                            updatedData[index][field] = null;
-                                        }
-                                    }
-                                }
-                                return updatedData;
-                            });
-
-                            const response = await getStark(data[index].address);
-                            setData(prevData => {
-                                const updatedData = [...prevData];
-                                updatedData[index] = {
-                                    ...updatedData[index],
-                                    ...response,
-                                    refresh: +new Date()
-                                };
-                                localStorage.setItem('stark_addresses', JSON.stringify(updatedData));
-                                return updatedData;
-                            });
-                            resolve();
-                        } catch (error) {
-                            reject(error);
-                        }
-                    });
-                    promisesQueue.push(promiseFunction);
-                }
-            }
-            processQueue();
-            while (activePromises > 0 || promisesQueue.length > 0) {
-                await new Promise(resolve => setTimeout(resolve, 100));
-            }
-            notification.success({
-                message: "完成",
-                description: "刷新地址数据完成",
-                duration: 1,
-            });
-        } catch (error) {
-            notification.error({
-                message: "错误",
-                description: error.message,
-                duration: 1,
-            });
-        } finally {
-            setIsLoading(false);
-            if (!singleKey) {
-                setSelectedKeys([]);
-            }
-        }
-    };
-
-    const handleDeleteSelected = async () => {
-        if (!selectedKeys.length) {
-            notification.error({
-                message: "错误",
-                description: "请先选择要删除的地址",
-                duration: 1,
-            });
-            return;
-        }
-        const addresses = data.filter(item => selectedKeys.includes(item.key)).map(item => item.address);
-        await deleteData("starkTransactions", addresses);
-        setData(data.filter(item => !selectedKeys.includes(item.key)));
-        localStorage.setItem('stark_addresses', JSON.stringify(data.filter(item => !selectedKeys.includes(item.key))));
-        setSelectedKeys([]);
-    }
-    const exportToExcelFile = () => {
-        exportToExcel(data, 'starkInfo');
-    }
     const rowSelection = {
         selectedRowKeys: selectedKeys,
         onChange: (selectedRowKeys) => {
             setSelectedKeys(selectedRowKeys);
         },
     };
-
-    function formatNumber(number, decimals = 3) {
-        return number === 0 ? '0' : number.toFixed(decimals);
-    }
-
     const centeredTextStyle = {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         height: '100%',
-        width: '100%'
-    };
-    const tableSummary = (pageData) => {
-        let totalEthBalance = 0;
-        let totalUsdcBalance = 0;
-        let totalUsdtBalance = 0;
-        let totalDaiBalance = 0;
-        let totalWBTCBalance = 0;
-        let totalL1Tol2Amount = 0;
-        let totalL2Tol1Amount = 0;
-        let totalAmount = 0;
-        let totalFee = 0;
-
-        pageData.forEach((row) => {
-            totalEthBalance += parseFloat(row.balance?.ETH || 0);
-            totalUsdcBalance += parseFloat(row.balance?.USDC || 0);
-            totalUsdtBalance += parseFloat(row.balance?.USDT || 0);
-            totalDaiBalance += parseFloat(row.balance?.DAI || 0);
-            totalWBTCBalance += parseFloat(row.balance?.WBTC || 0);
-            totalL1Tol2Amount += parseFloat(row.bridge?.DepositVolume || 0);
-            totalL2Tol1Amount += parseFloat(row.bridge?.WithdrawVolume || 0);
-            totalAmount += parseFloat(row.Vol || 0);
-            totalFee += parseFloat(row.fee || 0);
-        });
-
-        return (
-            <Table.Summary>
-                <Table.Summary.Row>
-                    <Table.Summary.Cell index={0}>
-                        <div style={centeredTextStyle}>
-                            <Text type={"danger"}>总计</Text>
-                        </div>
-                    </Table.Summary.Cell>
-                    <Table.Summary.Cell index={1}/>
-                    <Table.Summary.Cell index={19}/>
-                    <Table.Summary.Cell index={2}/>
-                    <Table.Summary.Cell index={3}/>
-                    <Table.Summary.Cell index={4}/>
-                    <Table.Summary.Cell index={5}>
-                        <div style={centeredTextStyle}>
-                            <Text type="danger">{formatNumber(totalEthBalance)}</Text>
-                        </div>
-                    </Table.Summary.Cell>
-                    <Table.Summary.Cell index={6}>
-                        <div style={centeredTextStyle}>
-                            <Text type="danger">{formatNumber(totalUsdcBalance)}</Text>
-                        </div>
-                    </Table.Summary.Cell>
-                    <Table.Summary.Cell index={7}>
-                        <div style={centeredTextStyle}>
-                            <Text type="danger">{formatNumber(totalUsdtBalance)}</Text>
-                        </div>
-                    </Table.Summary.Cell>
-                    <Table.Summary.Cell index={8}>
-                        <div style={centeredTextStyle}>
-                            <Text type="danger">{formatNumber(totalDaiBalance)}</Text>
-                        </div>
-                    </Table.Summary.Cell>
-                    <Table.Summary.Cell index={9}>
-                        <div style={centeredTextStyle}>
-                            <Text type="danger">{formatNumber(totalWBTCBalance)}</Text>
-                        </div>
-                    </Table.Summary.Cell>
-                    <Table.Summary.Cell index={10}/>
-                    <Table.Summary.Cell index={11}/>
-                    <Table.Summary.Cell index={12}/>
-                    <Table.Summary.Cell index={13}/>
-                    <Table.Summary.Cell index={14}>
-                        <div style={centeredTextStyle}>
-                            <Text type="danger">{formatNumber(totalL1Tol2Amount, 2)}</Text>
-                        </div>
-                    </Table.Summary.Cell>
-                    <Table.Summary.Cell index={15}>
-                        <div style={centeredTextStyle}>
-                            <Text type="danger">{formatNumber(totalL2Tol1Amount, 2)}</Text>
-                        </div>
-                    </Table.Summary.Cell>
-                    <Table.Summary.Cell index={16}/>
-                    <Table.Summary.Cell index={17}/>
-                    <Table.Summary.Cell index={18}/>
-                    <Table.Summary.Cell index={22}/>
-                    <Table.Summary.Cell index={20}>
-                        <div style={centeredTextStyle}>
-                            <Text type="danger">
-                                {formatNumber(totalAmount, 2)}
-                            </Text>
-                        </div>
-                    </Table.Summary.Cell>
-                    <Table.Summary.Cell index={21}>
-                        <div style={centeredTextStyle}>
-                            <Text type="danger">
-                                {formatNumber(totalFee, 2)}
-                            </Text>
-                        </div>
-                    </Table.Summary.Cell>
-                    <Table.Summary.Cell index={23}/>
-                </Table.Summary.Row>
-            </Table.Summary>
-        );
+        width: '100%',
+        color: 'red'
     };
     return (
         <div>
@@ -643,77 +1108,101 @@ const Stark = () => {
                        }}
                        okText={"添加地址"}
                        cancelText={"取消"}
-                       width={800}
                 >
                     <Form form={batchForm} layout="vertical">
-                        <Form.Item label="地址" name="addresses" rules={[
-                            {
-                                required: true,
-                                validator: (_, value) => {
-                                    const addresses = value.split("\n");
-                                    let errorLines = [];
-                                    for (let i = 0; i < addresses.length; i++) {
-                                        let address = addresses[i].trim();
-                                        if (address.length === 0) {
-                                            errorLines.push(i + 1);
-                                        }
-                                    }
-                                    if (errorLines.length) {
-                                        return Promise.reject(`行 ${errorLines.join(", ")} 的地址格式错误，请输入正确的stark地址`);
-                                    }
-                                    return Promise.resolve();
-                                }
-                            }
-                        ]}>
+                        <Form.Item label="地址" name="addresses" rules={[{required: true}]}>
                             <TextArea placeholder="请输入地址，每行一个"
-                                      style={{width: "100%", height: "300px", resize: "none"}}
+                                      style={{width: "500px", height: "200px"}}
                             />
                         </Form.Item>
                     </Form>
                 </Modal>
-                <div style={{marginBottom: "50px"}}>
-                    <Spin spinning={tableLoading} size={"small"}>
-                        <Table
-                            sticky
-                            rowSelection={rowSelection}
-                            dataSource={data}
-                            pagination={false}
-                            bordered={true}
-                            style={{marginBottom: "120px", zIndex: 2}}
-                            size={"small"}
-                            columns={columns}
-                            summary={tableSummary}
-                        />
-                    </Spin>
-                </div>
+                <Modal title="添加地址" open={isModalVisible} onOk={handleOk}
+                       onCancel={() => setIsModalVisible(false)}
+                       okText={"添加地址"}
+                       cancelText={"取消"}
+                >
+                    <Form form={form} layout="vertical">
+                        <Form.Item label="地址" name="address" rules={[{required: true}]}>
+                            <Input placeholder="请输入地址"/>
+                        </Form.Item>
+                        <Form.Item label="备注" name="name">
+                            <Input placeholder="请输入备注"/>
+                        </Form.Item>
+                    </Form>
+                </Modal>
+                <Spin spinning={tableLoading}>
+                    <Table
+                        sticky
+                        rowSelection={rowSelection}
+                        dataSource={data}
+                        pagination={false}
+                        bordered={true}
+                        style={{marginBottom: "120px", zIndex: 2}}
+                        size={"small"}
+                        columns={columns}
+                        summary={pageData => {
+                            let starkEthBalance = 0;
+                            let starkUsdcBalance = 0;
+                            let starkUsdtBalance = 0;
+                            let starkDaiBalance = 0;
+                            pageData.forEach(({
+                                                  stark_eth_balance,
+                                                  stark_usdc_balance,
+                                                  stark_usdt_balance,
+                                                  stark_dai_balance,
+                                              }) => {
+                                starkEthBalance += Number(stark_eth_balance);
+                                starkUsdcBalance += Number(stark_usdc_balance);
+                                starkUsdtBalance += Number(stark_usdt_balance);
+                                starkDaiBalance += Number(stark_dai_balance);
+                            })
+
+                            const emptyCells = Array(15).fill().map((_, index) => <Table.Summary.Cell key={index} index={index + 10}/>);
+
+                            return (
+                                <>
+                                    <Table.Summary.Row>
+                                        <Table.Summary.Cell index={0}><div style={centeredTextStyle}>总计</div></Table.Summary.Cell>
+                                        <Table.Summary.Cell index={0} colSpan={5} ></Table.Summary.Cell>
+                                        <Table.Summary.Cell index={6} ><div style={centeredTextStyle}>{starkEthBalance.toFixed(4)}</div></Table.Summary.Cell>
+                                        <Table.Summary.Cell index={7}><div style={centeredTextStyle}>{starkUsdcBalance.toFixed(2)}</div></Table.Summary.Cell>
+                                        <Table.Summary.Cell index={8}><div style={centeredTextStyle}>{starkUsdtBalance.toFixed(2)}</div></Table.Summary.Cell>
+                                        <Table.Summary.Cell index={9}><div style={centeredTextStyle}>{starkDaiBalance.toFixed(2)}</div></Table.Summary.Cell>
+                                        {/* {emptyCells} */}
+                                    </Table.Summary.Row>
+                                </>
+                            )
+                        }}
+                    />
+                </Spin>
+
                 <div className="stark_footer">
-                    <Card size={"small"} style={{width: "100%"}}>
-                        <div style={{width: '100%', display: 'flex', justifyContent: 'space-between', gap: '20px',}}>
-                            <Button type="primary" onClick={() => {
-                                setIsBatchModalVisible(true)
-                            }} size={"large"} style={{flex: 1}} icon={<UploadOutlined/>} loading={batchLoading}>
-                                {batchLoading ? "添加中..." : "添加地址"}
-                            </Button>
-                            <Button type="primary" onClick={() => handleRefresh()} loading={isLoading} size={"large"}
+                <Card>
+                    <div style={{width: '100%', display: 'flex', justifyContent: 'space-between', gap: '20px'}}>
+                        <Button type="primary" onClick={() => {
+                            setIsBatchModalVisible(true)
+                        }} size={"large"} style={{flex: 1}} icon={<UploadOutlined/>}>
+                            添加地址
+                        </Button>
+                        <Button type="primary" onClick={handleRefresh} loading={isLoading} size={"large"}
                                     style={{flex: 1}}
                                     icon={<SyncOutlined/>}>
                                 刷新选中地址
+                        </Button>
+                        <Popconfirm title={"确认删除" + selectedKeys.length + "个地址？"}
+                                    onConfirm={handleDeleteSelected}>
+                            <Button type="primary" danger size={"large"}
+                                    style={{flex: 1}}
+                                    icon={<DeleteOutlined/>}>
+                                删除选中地址
                             </Button>
-                            <Popconfirm title={"确认删除" + selectedKeys.length + "个地址？"}
-                                        onConfirm={async () => {
-                                            await handleDeleteSelected()
-                                        }}>
-                                <Button type="primary" danger size={"large"}
-                                        style={{flex: 1}}
-                                        icon={<DeleteOutlined/>}>
-                                    删除选中地址
-                                </Button>
-                            </Popconfirm>
-                            <Button type="primary" icon={<DownloadOutlined/>} size={"large"} style={{flex: 1}}
-                                    onClick={exportToExcelFile}
-                            />
-                        </div>
-                    </Card>
+                        </Popconfirm>
+                        <Button type="primary" icon={<DownloadOutlined/>} size={"large"} style={{flex: 1}}
+                                onClick={exportToExcelFile}
+                        />
+                    </div>
+                </Card>
                 </div>
             </Content>
         </div>

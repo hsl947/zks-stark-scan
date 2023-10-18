@@ -19,3 +19,7 @@
     width: 100%;
     z-index: 2;
 }
+
+.stark_footer .ant-card .ant-card-body{
+    padding: 12px;
+}
