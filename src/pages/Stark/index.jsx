@@ -1075,7 +1075,7 @@ const Stark = () => {
                     render: (text, record) => (
                         <Space size="small">
                             <Popconfirm title={"确认删除？"} onConfirm={() => handleDelete(record.key)}>
-                                <Button icon={<DeleteOutlined/>}/>
+                                <Button size='small' icon={<DeleteOutlined/>}/>
                             </Popconfirm>
                         </Space>
                     ),
@@ -1164,7 +1164,7 @@ const Stark = () => {
                                 <>
                                     <Table.Summary.Row>
                                         <Table.Summary.Cell index={0}><div style={centeredTextStyle}>总计</div></Table.Summary.Cell>
-                                        <Table.Summary.Cell index={0} colSpan={5} ></Table.Summary.Cell>
+                                        <Table.Summary.Cell index={0} colSpan={4} ></Table.Summary.Cell>
                                         <Table.Summary.Cell index={6} ><div style={centeredTextStyle}>{starkEthBalance.toFixed(4)}</div></Table.Summary.Cell>
                                         <Table.Summary.Cell index={7}><div style={centeredTextStyle}>{starkUsdcBalance.toFixed(2)}</div></Table.Summary.Cell>
                                         <Table.Summary.Cell index={8}><div style={centeredTextStyle}>{starkUsdtBalance.toFixed(2)}</div></Table.Summary.Cell>
