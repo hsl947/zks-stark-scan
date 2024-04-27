@@ -13,6 +13,9 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
+  <component name="GitToolBoxStore">
+    <option name="projectConfigVersion" value="5" />
+  </component>
   <component name="MarkdownSettingsMigration">
     <option name="stateVersion" value="1" />
   </component>
@@ -80,6 +83,7 @@
       <workItem from="1697287959595" duration="3513000" />
       <workItem from="1697336892359" duration="541000" />
       <workItem from="1697352953775" duration="594000" />
+      <workItem from="1714196682771" duration="327000" />
     </task>
     <task id="LOCAL-00001" summary="fix: 修复stark查询错误">
       <option name="closed" value="true" />

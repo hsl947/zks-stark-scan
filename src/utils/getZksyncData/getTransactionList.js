@@ -29,19 +29,14 @@ const getAllTransfers = async (address) => {
 };
 
 const assignTransferValues = async (transactions) => {
-    const ethResponse = await axios.post('https://mainnet.era.zksync.io/', {
-        id: 42,
-        jsonrpc: '2.0',
-        method: 'zks_getTokenPrice',
-        params: ['0x0000000000000000000000000000000000000000'],
-    });
+    const ethResponse = await axios.post('https://min-api.cryptocompare.com/data/price?fsym=ETH&tsyms=USD');
     const tokensPrice = {
         USDC: 1,
         USDT: 1,
         ZKUSD: 1,
         CEBUSD: 1,
         LUSD: 1,
-        ETH: parseInt(ethResponse.data.result),
+        ETH: parseInt(ethResponse.data.USD),
     };
 
     transactions.forEach((transaction) => {
